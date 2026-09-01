@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /panel-dashboard
+Disallow: /panel-dashboard/login
+Disallow: /admin
+Disallow: /login
+Disallow: /checkout
+Disallow: /cart
+Disallow: /payment/
+
+Sitemap: /sitemap.xml

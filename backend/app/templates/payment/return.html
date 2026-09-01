@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>نتیجه پرداخت</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --ok: #22c55e;
+      --fail: #ef4444;
+      --pend: #f59e0b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: Tahoma, Vazirmatn, sans-serif;
+      background: radial-gradient(ellipse at top, #1e3a5f, var(--bg));
+      color: var(--text);
+      padding: 24px;
+    }
+    .box {
+      width: min(440px, 100%);
+      background: var(--card);
+      border-radius: 20px;
+      padding: 32px 28px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    .icon {
+      width: 72px; height: 72px; border-radius: 50%;
+      display: grid; place-items: center; margin: 0 auto 16px;
+      font-size: 36px; font-weight: bold;
+    }
+    .success .icon { background: color-mix(in oklab, var(--ok) 25%, transparent); color: var(--ok); }
+    .failed .icon { background: color-mix(in oklab, var(--fail) 25%, transparent); color: var(--fail); }
+    .pending .icon { background: color-mix(in oklab, var(--pend) 25%, transparent); color: var(--pend); }
+    h1 { margin: 0 0 8px; font-size: 1.4rem; }
+    p { color: var(--muted); line-height: 1.7; }
+    .tracking { font-family: monospace; background: #0f172a; padding: 8px 12px; border-radius: 8px; display: inline-block; margin-top: 8px; }
+    a.btn {
+      display: inline-block; margin-top: 20px; padding: 12px 22px;
+      border-radius: 12px; background: #38bdf8; color: #0f172a;
+      text-decoration: none; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="box {{ status }}">
+    <div class="icon">
+      {% if status == "success" %}✓{% elif status == "pending" %}…{% else %}✕{% endif %}
+    </div>
+    <h1>
+      {% if status == "success" %}پرداخت موفق
+      {% elif status == "pending" %}در انتظار تأیید
+      {% else %}پرداخت ناموفق{% endif %}
+    </h1>
+    {% if message %}<p>{{ message }}</p>{% endif %}
+    {% if tracking %}
+      <p>کد پیگیری</p>
+      <div class="tracking">{{ tracking }}</div>
+    {% endif %}
+    <p>
+      <a class="btn" href="{{ shop_orders_url }}">بازگشت به فروشگاه</a>
+    </p>
+    <p style="font-size:.85rem"><a href="{{ deep_link }}" style="color:#38bdf8">بازگشت به اپلیکیشن</a></p>
+  </div>
+  <script>
+    // Attempt deep link for mobile apps
+    setTimeout(function () {
+      try { window.location.href = "{{ deep_link }}"; } catch (e) {}
+    }, 800);
+  </script>
+</body>
+</html>

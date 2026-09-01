@@ -1,0 +1,207 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-copper-400: #e8a87c;
+  --color-copper-400-rgb: 232 168 124;
+  --color-copper-500: #d97757;
+  --color-copper-500-rgb: 217 119 87;
+  --color-copper-600: #c45c3e;
+  --color-copper-600-rgb: 196 92 62;
+  --color-copper-700: #a34830;
+  --color-copper-700-rgb: 163 72 48;
+  --color-sea-400: #5b9fd4;
+  --color-sea-400-rgb: 91 159 212;
+  --color-sea-500: #3b82b6;
+  --color-sea-500-rgb: 59 130 182;
+  --color-sea-600: #2f6a96;
+  --color-sea-600-rgb: 47 106 150;
+  --color-ink-950: #0b1220;
+  --color-ink-950-rgb: 11 18 32;
+  --color-ink-900: #111827;
+  --color-ink-900-rgb: 17 24 39;
+  --color-ink-800: #1f2937;
+  --color-ink-800-rgb: 31 41 55;
+  --color-ink-700: #374151;
+  --color-ink-700-rgb: 55 65 81;
+  --color-mist-50: #f6f7f9;
+  --color-mist-50-rgb: 246 247 249;
+  --color-mist-100: #eef1f5;
+  --color-mist-100-rgb: 238 241 245;
+  --color-mist-200: #dce3ec;
+  --color-mist-200-rgb: 220 227 236;
+  --brand: var(--color-copper-500);
+  --ink: var(--color-ink-950);
+  --mist: var(--color-mist-50);
+  --sea: var(--color-sea-500);
+  --hero-mesh: radial-gradient(ellipse 80% 60% at 70% 20%, color-mix(in srgb, var(--color-copper-400) 28%, transparent), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 10% 80%, color-mix(in srgb, var(--color-sea-400) 22%, transparent), transparent 50%),
+    linear-gradient(165deg, #070b14 0%, #121c2e 45%, #182636 100%);
+  --hero-grid: radial-gradient(ellipse at 20% 20%, color-mix(in srgb, var(--color-sea-400) 25%, transparent), transparent 50%),
+    radial-gradient(ellipse at 80% 0%, color-mix(in srgb, var(--color-copper-400) 22%, transparent), transparent 45%),
+    linear-gradient(160deg, #0b1220 0%, #152238 55%, #1a2a40 100%);
+  --body-spot-a: color-mix(in srgb, var(--color-sea-500) 7%, transparent);
+  --body-spot-b: color-mix(in srgb, var(--color-copper-500) 6%, transparent);
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --hero-mesh: radial-gradient(ellipse 80% 60% at 70% 20%, color-mix(in srgb, var(--color-copper-400) 22%, transparent), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 10% 80%, color-mix(in srgb, var(--color-sea-400) 18%, transparent), transparent 50%),
+    linear-gradient(165deg, #05070c 0%, #0b1220 45%, #111827 100%);
+  --body-spot-a: color-mix(in srgb, var(--color-sea-500) 12%, transparent);
+  --body-spot-b: color-mix(in srgb, var(--color-copper-500) 10%, transparent);
+}
+
+html[data-theme='green'] {
+  --hero-mesh: radial-gradient(ellipse 80% 60% at 70% 20%, color-mix(in srgb, var(--color-copper-400) 26%, transparent), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 10% 80%, color-mix(in srgb, var(--color-sea-400) 22%, transparent), transparent 50%),
+    linear-gradient(165deg, #04140e 0%, #0a2418 45%, #0f2f22 100%);
+}
+
+body {
+  @apply bg-mist-50 text-ink-900 font-body antialiased;
+  background-image:
+    radial-gradient(circle at 0% 0%, var(--body-spot-a), transparent 42%),
+    radial-gradient(circle at 100% 8%, var(--body-spot-b), transparent 38%);
+  min-height: 100vh;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--brand) 35%, white);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition duration-200;
+  }
+  .btn-primary {
+    @apply btn bg-copper-500 text-white hover:bg-copper-600 shadow-soft;
+  }
+  .btn-secondary {
+    @apply btn border border-mist-200 bg-white text-ink-900 hover:border-copper-400 hover:bg-mist-50;
+  }
+  .btn-ghost {
+    @apply btn border border-white/20 bg-white/5 text-white hover:bg-white/10;
+  }
+  .btn-dark {
+    @apply btn bg-ink-900 text-white hover:bg-ink-800;
+  }
+  .input {
+    @apply w-full max-w-full min-w-0 rounded-xl border border-mist-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-sea-400 focus:ring-2 focus:ring-sea-400/20;
+  }
+  .select-field {
+    @apply input w-full min-w-0 max-w-full cursor-pointer truncate text-start;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink-700;
+  }
+  .price-range-input {
+    @apply pointer-events-none absolute inset-x-0 top-0 h-9 w-full max-w-full appearance-none bg-transparent;
+  }
+  .price-range-input::-webkit-slider-runnable-track {
+    @apply h-1.5 bg-transparent;
+  }
+  .price-range-input::-moz-range-track {
+    @apply h-1.5 bg-transparent;
+  }
+  .price-range-input::-webkit-slider-thumb {
+    @apply pointer-events-auto relative z-20 h-5 w-5 cursor-grab appearance-none rounded-full border-2 border-white bg-copper-500 shadow-[0_2px_8px_rgba(217,119,87,0.45)] active:cursor-grabbing;
+    margin-top: -7px;
+  }
+  .price-range-input::-moz-range-thumb {
+    @apply pointer-events-auto relative z-20 h-5 w-5 cursor-grab rounded-full border-2 border-white bg-copper-500 shadow-[0_2px_8px_rgba(217,119,87,0.45)] active:cursor-grabbing;
+  }
+  .price-range-input:focus-visible::-webkit-slider-thumb {
+    @apply ring-2 ring-sea-400 ring-offset-2;
+  }
+  .price-range-input:focus-visible::-moz-range-thumb {
+    @apply ring-2 ring-sea-400 ring-offset-2;
+  }
+  .admin-sidebar-scroll {
+    @apply min-h-0 overflow-y-auto overscroll-y-contain;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+    scroll-padding-block: 0.5rem;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+  }
+  .admin-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
+  }
+  .checkout-summary-scroll {
+    @apply min-h-0 max-h-72 overflow-y-auto overscroll-y-contain pe-1;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+    scroll-padding-block: 0.25rem;
+    mask-image: linear-gradient(to bottom, transparent, #000 8px, #000 calc(100% - 8px), transparent);
+  }
+  .checkout-summary-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .checkout-summary-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .checkout-summary-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+  }
+  .checkout-summary-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.35);
+  }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal-in,
+.reveal-scope.reveal-in .reveal {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.hero-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.45'/%3E%3C/svg%3E");
+  background-size: 180px;
+  mix-blend-mode: overlay;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal,
+  .reveal-in,
+  .reveal-scope.reveal-in .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .animate-rise,
+  .animate-floaty,
+  .animate-orb,
+  .animate-orb-slow,
+  .animate-pulse-soft,
+  .animate-bounce-soft,
+  .animate-shimmer {
+    animation: none !important;
+  }
+}

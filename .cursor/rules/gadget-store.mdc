@@ -1,0 +1,10 @@
+# Gadget Store Project Rules
+
+- Backend is Django + DRF under `backend/`; keep business logic in `app/services/`.
+- Payment gateways live in `backend/app/payment/` (Driver + Registry + Facade). Add new gateways as a driver file + register in `ALL_DRIVERS`.
+- Amounts are always **toman** internally; convert to rial only inside drivers that require it.
+- Frontend is React + Vite + Tailwind under `frontend/src/`. Public shop vs `/admin` management stay separate layouts.
+- Prefer Persian UI copy for end-user surfaces; keep code/identifiers in English.
+- Use `./docker.sh` (or `.\docker.ps1` on Windows) for env lifecycle — do not invent ad-hoc compose commands in docs.
+- Do not commit secrets; use `.env` from `.env.example`.
+- When editing UI, follow brand copper/sea/ink palette and Vazirmatn; avoid generic purple AI aesthetics.

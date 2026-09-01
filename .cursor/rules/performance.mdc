@@ -1,0 +1,55 @@
+---
+description: Always design and write code with performance and scalability in mind
+alwaysApply: true
+---
+
+# Performance-First Coding
+
+Whenever creating or changing code, design for performance so the app stays fast under real load. Prefer correct + efficient defaults over premature micro-optimization, but never ship obvious N+1, unbounded queries, or heavy work on the hot path.
+
+## Backend (Django / DRF)
+
+- Avoid N+1: use `select_related` / `prefetch_related` for list/detail serializers and admin inlines.
+- Never load unbounded querysets into memory; paginate list APIs and admin changelists.
+- Put filters/lookups on indexed fields; add DB indexes for frequent filter/order pairs.
+- Keep business logic out of tight request loops; batch writes with `bulk_create` / `bulk_update` when inserting many rows.
+- Do not call external payment/HTTP APIs inside DB transactions longer than necessary; commit first when safe.
+- Offload slow work (email, reports, heavy sync) to Celery — not request/response.
+- Cache only stable, read-heavy data (settings, gateway catalog); invalidate on write.
+- Log without dumping large payloads or secrets.
+
+```python
+# ❌ BAD — N+1
+for order in Order.objects.all():
+    print(order.user.email)
+
+# ✅ GOOD
+for order in Order.objects.select_related("user").all()[:100]:
+    print(order.user.email)
+```
+
+## Frontend (React / Vite)
+
+- Fetch only what the page needs; avoid refetching on every unrelated render.
+- List UIs: paginate/virtualize long lists; do not render huge arrays at once.
+- Debounce search inputs; cancel or ignore stale responses.
+- Prefer CSS/Tailwind for animation; avoid layout thrash in scroll handlers.
+- Do not put large objects in React state if a ref or derived value is enough.
+- Images: sensible sizes, lazy-load below the fold when lists grow.
+
+```jsx
+# ❌ BAD — search fires every keystroke without debounce
+useEffect(() => { api.search(q) }, [q])
+
+# ✅ GOOD — debounce before requesting
+useEffect(() => {
+  const t = setTimeout(() => api.search(q), 300)
+  return () => clearTimeout(t)
+}, [q])
+```
+
+## General
+
+- Measure the hot path before clever tricks; fix algorithmic waste first (O(n²), duplicate work).
+- Fail closed on huge inputs (max page size, upload size, payload limits).
+- New endpoints/features must consider: query count, payload size, and concurrency — not only happy-path correctness.

@@ -1,0 +1,118 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gadgetstore}
+      POSTGRES_USER: ${POSTGRES_USER:-gadget}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gadget_secret}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gadget} -d ${POSTGRES_DB:-gadgetstore}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: prod.txt
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      DJANGO_DEBUG: "False"
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - media_prod:/app/media
+      - static_prod:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command:
+      - sh
+      - /app/scripts/entrypoint.sh
+      - daphne
+      - -b
+      - 0.0.0.0
+      - -p
+      - "8000"
+      - config.asgi:application
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: prod.txt
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      - backend
+      - redis
+    restart: unless-stopped
+    command: sh /app/scripts/celery-worker.sh
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: prod.txt
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: production
+      POSTGRES_HOST: db
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    depends_on:
+      - celery
+    restart: unless-stopped
+    command: sh /app/scripts/celery-beat.sh
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_API_BASE:-https://api.example.com}/api/v1
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data_prod:
+  redis_data_prod:
+  media_prod:
+  static_prod:

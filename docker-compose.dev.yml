@@ -1,0 +1,110 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gadgetstore}
+      POSTGRES_USER: ${POSTGRES_USER:-gadget}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gadget_secret}
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gadget} -d ${POSTGRES_DB:-gadgetstore}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # Not published to host — avoids Windows port conflicts; backend/celery use the Docker network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: dev.txt
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: development
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      RUN_SEED: "1"
+      PUBLIC_API_BASE: http://localhost:8000
+      FRONTEND_URL: http://localhost:5173
+    volumes:
+      - ./backend:/app
+      - media_dev:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command:
+      - sh
+      - /app/scripts/entrypoint.sh
+      - daphne
+      - -b
+      - 0.0.0.0
+      - -p
+      - "8000"
+      - config.asgi:application
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+      args:
+        REQUIREMENTS_FILE: dev.txt
+    env_file:
+      - .env
+    environment:
+      DJANGO_ENV: development
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+      - redis
+    command: sh /app/scripts/celery-worker.sh
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_BASE_URL: /api/v1
+      VITE_PROXY_TARGET: http://backend:8000
+      # Bind mounts on Windows/macOS Docker don't emit reliable FS events
+      CHOKIDAR_USEPOLLING: "true"
+      VITE_USE_POLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    # Keep stdin open so Vite stays interactive; helps some HMR setups
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data_dev:
+  media_dev:
+  frontend_node_modules:
