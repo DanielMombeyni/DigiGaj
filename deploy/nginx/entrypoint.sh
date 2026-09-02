@@ -10,11 +10,11 @@ SSL_CERT_FILE="ssl-certificate.pem"
 SSL_KEY_FILE="ssl-private.key"
 
 pem_valid() {
-  [ -f "$1" ] && [ -s "$1" ] && grep -q "BEGIN CERTIFICATE" "$1" 2>/dev/null
+  [ -f "$1" ] && [ -s "$1" ] && grep -qE '^-----BEGIN CERTIFICATE-----' "$1" 2>/dev/null
 }
 
 key_valid() {
-  [ -f "$1" ] && [ -s "$1" ] && grep -q "BEGIN.*PRIVATE KEY" "$1" 2>/dev/null
+  [ -f "$1" ] && [ -s "$1" ] && grep -qE '^-----BEGIN (EC |RSA )?PRIVATE KEY-----' "$1" 2>/dev/null
 }
 
 find_cert() {
@@ -55,4 +55,3 @@ else
 fi
 
 exec nginx -g "daemon off;"
-

@@ -106,14 +106,26 @@ def detect_public_ip(timeout: float = 3.0) -> str | None:
     return None
 
 
-def _pem_has_marker(path: Path, markers: tuple[str, ...]) -> bool:
+def _pem_has_marker(path: Path, begin_markers: tuple[str, ...]) -> bool:
     if not path.is_file() or path.stat().st_size == 0:
         return False
     try:
         text = path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return False
-    return any(marker in text for marker in markers)
+    for line in text.splitlines():
+        stripped = line.strip()
+        if any(stripped.startswith(marker) for marker in begin_markers):
+            return True
+    return False
+
+
+_CERT_BEGIN = ("-----BEGIN CERTIFICATE-----",)
+_KEY_BEGIN = (
+    "-----BEGIN PRIVATE KEY-----",
+    "-----BEGIN RSA PRIVATE KEY-----",
+    "-----BEGIN EC PRIVATE KEY-----",
+)
 
 
 def find_cloudflare_origin_cert() -> tuple[Path | None, Path | None]:
@@ -122,9 +134,7 @@ def find_cloudflare_origin_cert() -> tuple[Path | None, Path | None]:
     if env_cert and env_key:
         cert = Path(env_cert)
         key = Path(env_key)
-        if _pem_has_marker(cert, ("BEGIN CERTIFICATE",)) and _pem_has_marker(
-            key, ("BEGIN PRIVATE KEY", "BEGIN RSA PRIVATE KEY", "BEGIN EC PRIVATE KEY")
-        ):
+        if _pem_has_marker(cert, _CERT_BEGIN) and _pem_has_marker(key, _KEY_BEGIN):
             return cert, key
 
     search_dirs: list[Path] = []
@@ -142,9 +152,7 @@ def find_cloudflare_origin_cert() -> tuple[Path | None, Path | None]:
         for cert_name, key_name in CERT_KEY_PAIRS:
             cert = directory / cert_name
             key = directory / key_name
-            if _pem_has_marker(cert, ("BEGIN CERTIFICATE",)) and _pem_has_marker(
-                key, ("BEGIN PRIVATE KEY", "BEGIN RSA PRIVATE KEY", "BEGIN EC PRIVATE KEY")
-            ):
+            if _pem_has_marker(cert, _CERT_BEGIN) and _pem_has_marker(key, _KEY_BEGIN):
                 return cert, key
     return None, None
 
