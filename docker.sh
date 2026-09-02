@@ -14,6 +14,20 @@ ensure_env() {
   fi
 }
 
+print_urls() {
+  local env="$1"
+  if [[ "$env" == "dev" ]]; then
+    echo "  Frontend: http://localhost:5173"
+    echo "  API:      http://localhost:8000/api/v1/"
+    echo "  Docs:     http://localhost:8000/api/docs/"
+    echo "  Admin:    http://localhost:8000/admin/"
+  else
+    echo "  Site:     https://digigadg.com (یا http://SERVER_IP اگر SSL ندارید)"
+    echo "  API:      /api/v1/ (از همان دامنه via proxy)"
+    echo "  Panel:    /panel-dashboard"
+  fi
+}
+
 usage() {
   cat <<'EOF'
 Gadget Store — Docker helper
@@ -26,29 +40,29 @@ Environments:
   prod    Production stack
 
 Commands:
-  up              Start services (detached)
+  up [svc]        Start stack (build if needed). Backend auto-runs:
+                  migrate, collectstatic, deploy detect, seed (once only).
+  rebuild [svc]   Rebuild images from scratch and recreate containers.
+  restart [svc] Restart all services, or only named ones (backend, proxy, …).
   down            Stop and remove containers
-  rebuild         Rebuild images and recreate containers
-  restart         Restart all services
   logs [svc]      Tail logs (optional service name)
   ps              List running containers
   shell           Open backend shell (bash)
-  manage <args>   Run Django manage.py (e.g. migrate, createsuperuser)
-  seed            Seed demo data
+  manage <args>   Run Django manage.py
+  seed            Force bootstrap seed
+  seed-demo       Force demo catalog seed
   migrate         Run migrations
   test            Run backend tests
   frontend-sh     Open frontend shell
   prune           Remove unused docker data for this project (careful)
 
 Examples:
-  ./docker.sh dev up
-  ./docker.sh dev down
   ./docker.sh prod up
   ./docker.sh prod rebuild
-  ./docker.sh prod down
+  ./docker.sh prod restart
+  ./docker.sh prod restart backend proxy
+  ./docker.sh dev up
   ./docker.sh dev logs backend
-  ./docker.sh dev manage createsuperuser
-  ./docker.sh dev seed
 EOF
 }
 
@@ -90,29 +104,43 @@ main() {
 
   case "$cmd" in
     up)
-      $COMPOSE up -d "$@"
+      echo "→ Starting $env stack (build if needed)..."
+      echo "  Backend entrypoint: migrate · static · deploy detect · seed (once)"
+      $COMPOSE up -d --build "$@"
+      echo ""
+      $COMPOSE ps
+      echo ""
       echo "✓ $env stack is up"
-      if [[ "$env" == "dev" ]]; then
-        echo "  Frontend: http://localhost:5173"
-        echo "  API:      http://localhost:8000/api/v1/"
-        echo "  Docs:     http://localhost:8000/api/docs/"
-        echo "  Admin:    http://localhost:8000/admin/"
-      else
-        echo "  Frontend: http://localhost:8080"
-        echo "  API:      http://localhost:8000/api/v1/"
-      fi
+      print_urls "$env"
       ;;
     down)
       $COMPOSE down "$@"
       echo "✓ $env stack stopped"
       ;;
     rebuild)
-      $COMPOSE build --no-cache "$@"
-      $COMPOSE up -d --force-recreate
+      echo "→ Rebuilding $env images (no cache)..."
+      if [[ $# -gt 0 ]]; then
+        $COMPOSE build --no-cache "$@"
+        $COMPOSE up -d --force-recreate "$@"
+      else
+        $COMPOSE build --no-cache
+        $COMPOSE up -d --force-recreate
+      fi
+      echo ""
+      $COMPOSE ps
+      echo ""
       echo "✓ $env rebuilt and restarted"
+      print_urls "$env"
       ;;
     restart)
-      $COMPOSE restart "$@"
+      if [[ $# -eq 0 ]]; then
+        echo "→ Restarting all $env services..."
+        $COMPOSE restart
+      else
+        echo "→ Restarting $env service(s): $*"
+        $COMPOSE restart "$@"
+      fi
+      echo "✓ restart complete"
       ;;
     logs)
       $COMPOSE logs -f --tail=200 "$@"
@@ -133,7 +161,10 @@ main() {
       $COMPOSE exec backend python manage.py migrate
       ;;
     seed)
-      $COMPOSE exec backend python manage.py seed_demo
+      $COMPOSE exec backend python manage.py seed_bootstrap --force "$@"
+      ;;
+    seed-demo)
+      $COMPOSE exec backend python manage.py seed_demo --force "$@"
       ;;
     test)
       $COMPOSE exec backend pytest -q "$@"
@@ -151,3 +182,4 @@ main() {
 }
 
 main "$@"
+

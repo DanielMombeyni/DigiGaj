@@ -12,6 +12,10 @@ env = environ.Env(
 environ.Env.read_env(ROOT_DIR / ".env")
 environ.Env.read_env(BASE_DIR / ".env", overwrite=False)
 
+_RUNTIME_DEPLOY_ENV = BASE_DIR / "runtime" / "deploy.env"
+if _RUNTIME_DEPLOY_ENV.exists():
+    environ.Env.read_env(_RUNTIME_DEPLOY_ENV, overwrite=False)
+
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="insecure-dev-key-change-me")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])

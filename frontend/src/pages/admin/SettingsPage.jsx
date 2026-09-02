@@ -83,6 +83,7 @@ export default function AdminSettingsPage() {
   const confirm = useConfirm()
   const [tab, setTab] = useState('auth')
   const [form, setForm] = useState(empty)
+  const [smsAvailable, setSmsAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -122,15 +123,29 @@ export default function AdminSettingsPage() {
     setError('')
     adminApi.storeConfig
       .get()
-      .then((r) =>
+      .then((r) => {
+        setSmsAvailable(!!r.data.sms_available)
         setForm({
           ...empty(),
           ...r.data,
           auth_methods: { ...empty().auth_methods, ...r.data.auth_methods },
-        }),
-      )
+        })
+      })
       .catch(() => setError('خطا در بارگذاری تنظیمات'))
       .finally(() => setLoading(false))
+  }
+
+  const refreshSmsAvailability = () => {
+    adminApi.storeConfig
+      .get()
+      .then((r) => {
+        setSmsAvailable(!!r.data.sms_available)
+        setForm((prev) => ({
+          ...prev,
+          auth_methods: { ...prev.auth_methods, ...r.data.auth_methods },
+        }))
+      })
+      .catch(() => {})
   }
 
   const loadSms = async () => {
@@ -164,6 +179,10 @@ export default function AdminSettingsPage() {
   )
 
   const toggleAuth = (key) => {
+    if (key === 'phone_otp' && !smsAvailable && !form.auth_methods?.phone_otp) {
+      setError('برای فعال‌سازی ورود با رمز یک‌بارمصرف، ابتدا یک سرویس پیامک فعال و تنظیم‌شده اضافه کنید.')
+      return
+    }
     setForm((prev) => {
       const next = { ...prev.auth_methods, [key]: !prev.auth_methods[key] }
       if (!Object.values(next).some(Boolean)) {
@@ -188,6 +207,7 @@ export default function AdminSettingsPage() {
     setSaving(true)
     try {
       const { data } = await adminApi.storeConfig.update(form)
+      setSmsAvailable(!!data.sms_available)
       setForm({
         ...empty(),
         ...data,
@@ -265,6 +285,7 @@ export default function AdminSettingsPage() {
       }
       closeSmsModal()
       await loadSms()
+      refreshSmsAvailability()
     } catch (err) {
       setSmsError(err.response?.data?.detail || 'خطا در ذخیره سرویس پیامک')
     } finally {
@@ -278,6 +299,7 @@ export default function AdminSettingsPage() {
     try {
       await adminApi.smsProviders.update(row.id, { is_enabled: !row.is_enabled })
       await loadSms()
+      refreshSmsAvailability()
     } catch (err) {
       setSmsError(err.response?.data?.detail || 'برای فعال‌سازی ابتدا اطلاعات را کامل کنید')
     } finally {
@@ -297,6 +319,7 @@ export default function AdminSettingsPage() {
     try {
       await adminApi.smsProviders.remove(row.id)
       await loadSms()
+      refreshSmsAvailability()
       setOk('سرویس حذف شد.')
     } catch (err) {
       setSmsError(err.response?.data?.detail || 'خطا در حذف')
@@ -499,22 +522,32 @@ export default function AdminSettingsPage() {
               <div className="grid gap-3">
                 {AUTH_OPTIONS.map((opt) => {
                   const on = !!form.auth_methods[opt.key]
+                  const otpBlocked = opt.key === 'phone_otp' && !smsAvailable
                   return (
                     <label
                       key={opt.key}
-                      className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition ${
-                        on ? 'border-copper-400/50 bg-copper-500/5' : 'border-mist-200 hover:bg-mist-50/80'
+                      className={`flex items-start gap-3 rounded-xl border px-4 py-3 transition ${
+                        otpBlocked
+                          ? 'cursor-not-allowed border-mist-200 bg-mist-50/60 opacity-70'
+                          : on
+                            ? 'cursor-pointer border-copper-400/50 bg-copper-500/5'
+                            : 'cursor-pointer border-mist-200 hover:bg-mist-50/80'
                       }`}
                     >
                       <input
                         type="checkbox"
                         className="mt-1"
                         checked={on}
+                        disabled={otpBlocked}
                         onChange={() => toggleAuth(opt.key)}
                       />
                       <span>
                         <span className="block font-medium text-ink-900">{opt.title}</span>
-                        <span className="mt-0.5 block text-xs text-ink-700/45">{opt.hint}</span>
+                        <span className="mt-0.5 block text-xs text-ink-700/45">
+                          {otpBlocked
+                            ? 'ابتدا در تب «سرویس پیامک» یک سرویس فعال و تنظیم‌شده اضافه کنید.'
+                            : opt.hint}
+                        </span>
                       </span>
                     </label>
                   )

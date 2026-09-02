@@ -23,3 +23,11 @@ htmlcov/
 .mypy_cache/
 *.egg-info/
 .docker-data/
+
+# Production SSL secrets (use ssl-*.example as template)
+deploy/ssl/ssl-certificate.pem
+deploy/ssl/ssl-private.key
+deploy/ssl/origin.pem
+deploy/ssl/origin.key
+deploy/ssl/cloudflare-origin.pem
+deploy/ssl/cert.pem

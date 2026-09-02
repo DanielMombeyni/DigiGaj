@@ -39,11 +39,14 @@ from app.serializers import (
     SiteSettingSerializer,
 )
 from app.services.store_config import (
+    admin_storefront_config,
     ensure_storefront_defaults,
     get_storefront_config,
     public_storefront_config,
     save_storefront_config,
 )
+from app.payment.facade import PaymentFacade
+from app.payment.utils import detect_platform
 from app.services.home_content import (
     ensure_store_defaults,
     get_home_hero,
@@ -242,22 +245,36 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         if err:
             return Response({"detail": err}, status=400)
 
-        result = {"order": OrderSerializer(order).data}
-        gateway = data.get("gateway")
-        if gateway:
-            pay, pay_err = PaymentService.create_purchase(
-                request=request,
-                gateway=gateway,
-                order=order,
-                platform=data.get("platform") or detect_platform(request),
-                mobile=order.phone,
+        platform = data.get("platform") or detect_platform(request)
+        enabled_gateways = PaymentFacade.list_enabled_public(request, platform)
+        if not enabled_gateways:
+            return Response(
+                {"detail": "درگاه پرداخت غیرفعال است."},
+                status=400,
             )
-            if pay_err:
-                return Response(
-                    {"order": result["order"], "payment_error": pay_err},
-                    status=201,
-                )
-            result["payment"] = pay
+
+        gateway = data.get("gateway")
+        if not gateway:
+            return Response({"detail": "درگاه پرداخت را انتخاب کنید."}, status=400)
+
+        valid_types = {g["provider_type"] for g in enabled_gateways}
+        if gateway not in valid_types:
+            return Response({"detail": "درگاه پرداخت نامعتبر است."}, status=400)
+
+        result = {"order": OrderSerializer(order).data}
+        pay, pay_err = PaymentService.create_purchase(
+            request=request,
+            gateway=gateway,
+            order=order,
+            platform=platform,
+            mobile=order.phone,
+        )
+        if pay_err:
+            return Response(
+                {"order": result["order"], "payment_error": pay_err},
+                status=201,
+            )
+        result["payment"] = pay
         return Response(result, status=201)
 
 
@@ -338,12 +355,12 @@ def admin_store_config(request):
 
     ensure_storefront_defaults()
     if request.method == "GET":
-        return Response(get_storefront_config())
+        return Response(admin_storefront_config())
     try:
-        saved = save_storefront_config(request.data)
+        save_storefront_config(request.data)
     except ValidationError as exc:
         return Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
-    return Response(saved)
+    return Response(admin_storefront_config())
 
 
 @api_view(["GET"])

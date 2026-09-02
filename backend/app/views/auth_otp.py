@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from app.models import UserProfile
-from app.services.store_config import get_storefront_config
+from app.services.store_config import effective_auth_methods
 from app.services.sms_service import SmsProviderService
 
 User = get_user_model()
@@ -38,7 +38,7 @@ def _tokens_for(user):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def request_otp(request):
-    methods = get_storefront_config()["auth_methods"]
+    methods = effective_auth_methods()
     if not methods.get("phone_otp"):
         return Response(
             {"detail": "ورود با رمز یک‌بارمصرف فعال نیست."},
@@ -84,7 +84,7 @@ def request_otp(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def verify_otp(request):
-    methods = get_storefront_config()["auth_methods"]
+    methods = effective_auth_methods()
     if not methods.get("phone_otp"):
         return Response(
             {"detail": "ورود با رمز یک‌بارمصرف فعال نیست."},

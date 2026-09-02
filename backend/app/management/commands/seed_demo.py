@@ -1,134 +1,36 @@
 from django.core.management.base import BaseCommand
-from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 
-from app.models import Category, Product, SitePage, SiteSetting, Banner, StaffRole, UserProfile
+from app.models import Category, Product, Banner
+from app.services.seed_state import DEMO_MARKER, is_seed_done, mark_seed_done
 
 
 class Command(BaseCommand):
-    help = "Seed demo catalog, pages, and admin user"
+    help = "Seed demo catalog (categories, products, banners)"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--if-needed",
+            action="store_true",
+            help="Skip when demo catalog was already applied once",
+        )
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help="Run even if demo catalog was already applied",
+        )
 
     def handle(self, *args, **options):
-        User = get_user_model()
-        admin, created = User.objects.get_or_create(
-            username="admin",
-            defaults={
-                "email": "admin@gadgetstore.local",
-                "is_staff": True,
-                "is_superuser": True,
-            },
-        )
-        admin.email = admin.email or "admin@gadgetstore.local"
-        admin.is_staff = True
-        admin.is_superuser = True
-        admin.is_active = True
-        admin.set_password("admin1234")
-        admin.save()
-        full_pages = [
-            "dashboard",
-            "products",
-            "categories",
-            "discounts",
-            "orders",
-            "accounting",
-            "gateways",
-            "transactions",
-            "tickets",
-            "settings",
-            "personnel",
-            "customers",
-            "storefront",
-        ]
-        role, _ = StaffRole.objects.get_or_create(
-            slug="full-access",
-            defaults={
-                "name": "دسترسی کامل",
-                "description": "دسترسی به تمام صفحات پنل",
-                "pages": full_pages,
-                "is_active": True,
-            },
-        )
-        if list(role.pages or []) != full_pages:
-            role.pages = full_pages
-            role.is_active = True
-            role.save(update_fields=["pages", "is_active", "updated_at"])
-        profile, _ = UserProfile.objects.get_or_create(user=admin)
-        profile.staff_role = role
-        profile.save(update_fields=["staff_role", "updated_at"])
-        self.stdout.write(
-            self.style.SUCCESS(
-                "Admin ready: admin / admin1234"
-                + (" (created)" if created else " (password reset)")
-            )
-        )
+        from django.core.management import call_command
 
-        SiteSetting.objects.update_or_create(
-            key="store",
-            defaults={
-                "value": {
-                    "name": "دیجی گج",
-                    "tagline": "فروشگاه تخصصی گجت و لوازم دیجیتال",
-                    "phone": "021-91000000",
-                    "email": "support@gadgetstore.local",
-                    "address": "تهران",
-                    "hero_glass_title": "اتمسفر دیجیتال",
-                    "hero_glass_subtitle": "تجربه خرید گجت، متفاوت",
-                }
-            },
-        )
+        if options["if_needed"] and not options["force"] and is_seed_done(DEMO_MARKER):
+            self.stdout.write(self.style.WARNING("Demo seed already applied — skipped (use --force to re-run)."))
+            return
 
-        SiteSetting.objects.update_or_create(
-            key="storefront",
-            defaults={
-                "value": {
-                    "auth_methods": {
-                        "username_password": True,
-                        "email_password": False,
-                        "phone_password": False,
-                        "phone_otp": False,
-                    },
-                    "company_phone": "",
-                    "company_address": "",
-                    "enamad_html": "",
-                }
-            },
-        )
-
-        from app.services.public_pages import DEFAULT_ENABLED
-
-        SiteSetting.objects.update_or_create(
-            key="public_pages",
-            defaults={"value": {"enabled": DEFAULT_ENABLED.copy(), "site_icon": ""}},
-        )
-
-        SitePage.objects.update_or_create(
-            slug="about",
-            defaults={
-                "title": "درباره ما",
-                "body": (
-                    "دیجی گج یک فروشگاه آنلاین تخصصی برای خرید و فروش گجت‌ها، "
-                    "لوازم جانبی و محصولات دیجیتال است. هدف ما ارائه کالای اصل "
-                    "با گارانتی معتبر و پشتیبانی سریع است."
-                ),
-                "is_published": True,
-            },
-        )
-        SitePage.objects.update_or_create(
-            slug="contact",
-            defaults={
-                "title": "تماس با ما",
-                "body": "از طریق ایمیل support@gadgetstore.local یا تلفن پشتیبانی با ما در ارتباط باشید.",
-                "is_published": True,
-            },
-        )
-        SitePage.objects.update_or_create(
-            slug="terms",
-            defaults={
-                "title": "قوانین و مقررات",
-                "body": "شرایط استفاده از فروشگاه، بازگشت کالا و حریم خصوصی.",
-                "is_published": True,
-            },
-        )
+        bootstrap_args = {}
+        if options["if_needed"] and not options["force"]:
+            bootstrap_args["if_needed"] = True
+        call_command("seed_bootstrap", **bootstrap_args)
 
         Banner.objects.get_or_create(
             title="گجت‌های روز را همین امروز بخرید",
@@ -180,4 +82,5 @@ class Command(BaseCommand):
                 },
             )
 
-        self.stdout.write(self.style.SUCCESS("Seed data ready."))
+        mark_seed_done(DEMO_MARKER)
+        self.stdout.write(self.style.SUCCESS("Demo seed ready."))

@@ -36,15 +36,19 @@ services:
     environment:
       DJANGO_ENV: production
       DJANGO_DEBUG: "False"
+      AUTO_DEPLOY_CONFIG: "1"
+      SITE_DOMAIN: digigadg.com
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+      RUN_SEED: "1"
     volumes:
       - media_prod:/app/media
       - static_prod:/app/staticfiles
-    ports:
-      - "8000:8000"
+      - ./deploy/ssl:/etc/ssl/cloudflare:ro
+    expose:
+      - "8000"
     depends_on:
       db:
         condition: service_healthy
@@ -71,6 +75,8 @@ services:
       - .env
     environment:
       DJANGO_ENV: production
+      AUTO_DEPLOY_CONFIG: "1"
+      SITE_DOMAIN: digigadg.com
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
@@ -91,6 +97,8 @@ services:
       - .env
     environment:
       DJANGO_ENV: production
+      AUTO_DEPLOY_CONFIG: "1"
+      SITE_DOMAIN: digigadg.com
       POSTGRES_HOST: db
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
@@ -104,12 +112,29 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${PUBLIC_API_BASE:-https://api.example.com}/api/v1
-    ports:
-      - "8080:80"
+        VITE_API_BASE_URL: /api/v1
+    expose:
+      - "80"
     depends_on:
       - backend
     restart: unless-stopped
+
+  proxy:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./deploy/nginx/http.conf:/etc/nginx/templates/http.conf:ro
+      - ./deploy/nginx/https.conf:/etc/nginx/templates/https.conf:ro
+      - ./deploy/nginx/entrypoint.sh:/entrypoint.sh:ro
+      - ./deploy/ssl:/etc/ssl/cloudflare:ro
+      - ./deploy/ssl:/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
 volumes:
   postgres_data_prod:

@@ -115,6 +115,7 @@ export default function CheckoutPage() {
   const needsProfileFields = recipient === 'self' && profile && !profileIsComplete(profile)
   const atAddressLimit = addresses.length >= maxAddresses
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId)
+  const paymentAvailable = !loadingData && gateways.length > 0
 
   useEffect(() => {
     if (!user) {
@@ -279,6 +280,10 @@ export default function CheckoutPage() {
       return
     }
     if (!items.length) return
+    if (!paymentAvailable) {
+      setError('درگاه پرداخت غیرفعال است.')
+      return
+    }
 
     if (!selectedAddress) {
       setAddressError('انتخاب آدرس تحویل الزامی است. یک آدرس انتخاب کنید یا با دکمه «افزودن آدرس جدید» ثبت کنید.')
@@ -740,7 +745,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {gateways.length > 0 && (
+            {gateways.length > 0 ? (
               <div className="mt-5">
                 <div className="label">درگاه پرداخت</div>
                 <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -776,6 +781,12 @@ export default function CheckoutPage() {
                   })}
                 </div>
               </div>
+            ) : (
+              !loadingData && (
+                <p className="mt-5 rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  درگاه پرداخت غیرفعال است. در حال حاضر امکان ثبت و پرداخت سفارش وجود ندارد.
+                </p>
+              )
             )}
 
             {error && (
@@ -785,9 +796,14 @@ export default function CheckoutPage() {
             <button
               type="submit"
               className="btn-primary mt-5 w-full cursor-pointer py-3.5 disabled:opacity-50 sm:w-auto sm:min-w-56"
-              disabled={loading || !user || loadingData}
+              disabled={loading || !user || loadingData || !paymentAvailable}
+              title={!paymentAvailable && !loadingData ? 'درگاه پرداخت غیرفعال است' : undefined}
             >
-              {loading ? 'در حال ثبت...' : `پرداخت ${toman(payableTotal)}`}
+              {!paymentAvailable && !loadingData
+                ? 'درگاه پرداخت غیرفعال است'
+                : loading
+                  ? 'در حال ثبت...'
+                  : `پرداخت ${toman(payableTotal)}`}
             </button>
           </Section>
         </div>

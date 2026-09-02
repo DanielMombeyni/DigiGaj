@@ -103,6 +103,7 @@ class SmsProviderService:
             credentials=creds,
         )
         cfg.save()
+        cls._sync_phone_otp_auth_method()
         return cfg, None
 
     @classmethod
@@ -133,11 +134,19 @@ class SmsProviderService:
             cfg.is_enabled = enable
 
         cfg.save()
+        cls._sync_phone_otp_auth_method()
         return cfg, None
 
     @staticmethod
     def delete(cfg: SmsProviderConfig) -> None:
         cfg.delete()
+        SmsProviderService._sync_phone_otp_auth_method()
+
+    @staticmethod
+    def _sync_phone_otp_auth_method() -> None:
+        from app.services.store_config import sync_phone_otp_with_sms
+
+        sync_phone_otp_with_sms()
 
     @classmethod
     def get_active(cls) -> SmsProviderConfig | None:
@@ -146,6 +155,14 @@ class SmsProviderService:
             .order_by("sort_order", "id")
             .first()
         )
+
+    @classmethod
+    def is_available(cls) -> bool:
+        cfg = cls.get_active()
+        if not cfg:
+            return False
+        driver = get_driver(cfg.provider_type)
+        return bool(driver and driver.is_ready(cfg.credentials or {}))
 
     @classmethod
     def send_otp(cls, phone: str, code: str) -> tuple[bool, str | None]:
