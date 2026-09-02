@@ -170,7 +170,7 @@ cp deploy/ssl/ssl-private.key.example deploy/ssl/ssl-private.key
 
 ```bash
 chmod +x docker.sh
-./docker.sh prod up
+./docker.sh Production up
 ```
 
 این دستور:
@@ -188,9 +188,9 @@ chmod +x docker.sh
 بعد از اتمام:
 
 ```bash
-./docker.sh prod ps
-./docker.sh prod logs backend
-./docker.sh prod logs proxy
+./docker.sh Production ps
+./docker.sh Production logs backend
+./docker.sh Production logs proxy
 ```
 
 ### آدرس‌های دسترسی
@@ -208,7 +208,7 @@ chmod +x docker.sh
 ## دستورات `docker.sh`
 
 ```text
-./docker.sh prod <command> [args]
+./docker.sh Production <command> [args]
 ```
 
 | دستور | کاربرد |
@@ -230,19 +230,19 @@ chmod +x docker.sh
 
 ```bash
 # استقرار / بالا آوردن
-./docker.sh prod up
+./docker.sh Production up
 
 # بعد از تغییر کد — build کامل
-./docker.sh prod rebuild
+./docker.sh Production rebuild
 
 # ری‌استارت فقط nginx و backend
-./docker.sh prod restart proxy backend
+./docker.sh Production restart proxy backend
 
 # لاگ زنده
-./docker.sh prod logs proxy
+./docker.sh Production logs proxy
 
 # ساخت superuser اضافه
-./docker.sh prod manage createsuperuser
+./docker.sh Production manage createsuperuser
 ```
 
 ---
@@ -300,8 +300,8 @@ AUTO_DEPLOY_CONFIG=0
 اجرای دستی اجباری:
 
 ```bash
-./docker.sh prod seed
-./docker.sh prod seed-demo
+./docker.sh Production seed
+./docker.sh Production seed-demo
 ```
 
 ---
@@ -312,13 +312,13 @@ AUTO_DEPLOY_CONFIG=0
 
 ```bash
 git pull
-./docker.sh prod rebuild
+./docker.sh Production rebuild
 ```
 
 ### تغییر فقط تنظیمات nginx یا SSL
 
 ```bash
-./docker.sh prod restart proxy
+./docker.sh Production restart proxy
 ```
 
 ### Migration جدید
@@ -326,20 +326,20 @@ git pull
 Migration در entrypoint backend اجرا می‌شود. برای اجرای دستی:
 
 ```bash
-./docker.sh prod migrate
+./docker.sh Production migrate
 ```
 
 یا:
 
 ```bash
-./docker.sh prod restart backend
+./docker.sh Production restart backend
 ```
 
 ### مشاهده وضعیت
 
 ```bash
-./docker.sh prod ps
-./docker.sh prod logs backend --tail=100
+./docker.sh Production ps
+./docker.sh Production logs backend --tail=100
 ```
 
 ---
@@ -375,9 +375,9 @@ cat backup.sql | docker compose -f docker-compose.prod.yml exec -T db \
 ### سایت باز نمی‌شود
 
 ```bash
-./docker.sh prod ps          # همه سرویس Up هستند؟
-./docker.sh prod logs proxy  # nginx خطا دارد؟
-./docker.sh prod logs backend
+./docker.sh Production ps          # همه سرویس Up هستند؟
+./docker.sh Production logs proxy  # nginx خطا دارد؟
+./docker.sh Production logs backend
 ```
 
 - پورت 80/443 روی سرور باز باشد
@@ -387,35 +387,35 @@ cat backup.sql | docker compose -f docker-compose.prod.yml exec -T db \
 
 - `AUTO_DEPLOY_CONFIG=1` باشد
 - دامنه در `SITE_DOMAIN` یا `EXTRA_ALLOWED_HOSTS` باشد
-- `./docker.sh prod restart backend`
+- `./docker.sh Production restart backend`
 
 ### SSL کار نمی‌کند
 
 - فایل‌ها PEM کامل باشند (نه فقط کامنت)
-- `./docker.sh prod logs proxy` → باید `HTTPS enabled` ببینید
-- `./docker.sh prod restart proxy backend`
+- `./docker.sh Production logs proxy` → باید `HTTPS enabled` ببینید
+- `./docker.sh Production restart proxy backend`
 
 ### API 502 / 504
 
 ```bash
-./docker.sh prod logs backend
-./docker.sh prod restart backend
+./docker.sh Production logs backend
+./docker.sh Production restart backend
 ```
 
 ### Seed اجرا نشده
 
 ```bash
-./docker.sh prod logs backend | grep -i seed
-./docker.sh prod seed
-./docker.sh prod seed-demo
+./docker.sh Production logs backend | grep -i seed
+./docker.sh Production seed
+./docker.sh Production seed-demo
 ```
 
 ### پاک‌سازی کامل (⚠️ حذف داده)
 
 ```bash
-./docker.sh prod down
-./docker.sh prod prune
-./docker.sh prod up
+./docker.sh Production down
+./docker.sh Production prune
+./docker.sh Production up
 ```
 
 ---
@@ -455,9 +455,9 @@ store/
 
 | مشکل | دستور |
 |------|--------|
-| بالا نیامدن | `./docker.sh prod up` |
-| Build مجدد | `./docker.sh prod rebuild` |
-| ری‌استارت | `./docker.sh prod restart` |
-| لاگ | `./docker.sh prod logs <service>` |
+| بالا نیامدن | `./docker.sh Production up` |
+| Build مجدد | `./docker.sh Production rebuild` |
+| ری‌استارت | `./docker.sh Production restart` |
+| لاگ | `./docker.sh Production logs <service>` |
 
 برای محیط توسعه محلی از `./docker.sh dev up` استفاده کنید.

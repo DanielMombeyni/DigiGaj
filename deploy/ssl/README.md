@@ -10,7 +10,7 @@
 1. گواهی را از Cloudflare بگیرید: **SSL/TLS → Origin Server → Create Certificate**
 2. محتوای کامل PEM را در `ssl-certificate.pem` بچسبانید (شامل `-----BEGIN CERTIFICATE-----`)
 3. کلید خصوصی را در `ssl-private.key` بچسبانید (شامل `-----BEGIN PRIVATE KEY-----`)
-4. پروداکشن را ری‌استارت کنید: `./docker.sh prod restart proxy backend`
+4. Restart production: `./docker.sh Production restart proxy backend`
 
 تا وقتی خطوط واقعی PEM (شروع با `-----BEGIN CERTIFICATE-----` و `-----BEGIN PRIVATE KEY-----`) در این دو فایل نباشد، سایت فقط روی **HTTP (پورت 80)** بالا می‌آید. کامنت‌های راهنما در فایل، گواهی حساب نمی‌شوند.
 

@@ -22,8 +22,8 @@ print_urls() {
     echo "  Docs:     http://localhost:8000/api/docs/"
     echo "  Admin:    http://localhost:8000/admin/"
   else
-    echo "  Site:     https://digigadg.com (یا http://SERVER_IP اگر SSL ندارید)"
-    echo "  API:      /api/v1/ (از همان دامنه via proxy)"
+    echo "  Site:     https://digigadg.com (or http://SERVER_IP without SSL)"
+    echo "  API:      /api/v1/ (same domain via proxy)"
     echo "  Panel:    /panel-dashboard"
   fi
 }
@@ -36,8 +36,8 @@ Usage:
   ./docker.sh <env> <command> [args]
 
 Environments:
-  dev     Local development stack
-  prod    Production stack
+  dev          Local development stack
+  Production   Production stack
 
 Commands:
   up [svc]        Start stack (build if needed). Backend auto-runs:
@@ -57,10 +57,10 @@ Commands:
   prune           Remove unused docker data for this project (careful)
 
 Examples:
-  ./docker.sh prod up
-  ./docker.sh prod rebuild
-  ./docker.sh prod restart
-  ./docker.sh prod restart backend proxy
+  ./docker.sh Production up
+  ./docker.sh Production rebuild
+  ./docker.sh Production restart
+  ./docker.sh Production restart backend proxy
   ./docker.sh dev up
   ./docker.sh dev logs backend
 EOF
@@ -69,7 +69,7 @@ EOF
 compose_for() {
   case "$1" in
     dev) echo "$DEV_COMPOSE" ;;
-    prod) echo "$PROD_COMPOSE" ;;
+    Production|production|prod) echo "$PROD_COMPOSE" ;;
     *) echo ""; return 1 ;;
   esac
 }
@@ -95,7 +95,7 @@ main() {
 
   local COMPOSE
   COMPOSE="$(compose_for "$env")" || {
-    echo "Unknown env: $env (use dev|prod)"
+    echo "Unknown env: $env (use dev|Production)"
     exit 1
   }
 
