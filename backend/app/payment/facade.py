@@ -4,7 +4,7 @@ import logging
 
 from app.models import PaymentGatewayConfig
 from .registry import get_driver
-from .utils import detect_platform, public_api_base
+from .utils import absolute_media_url, detect_platform
 
 logger = logging.getLogger("app.payment")
 
@@ -39,7 +39,7 @@ class PaymentFacade:
                 continue
             logo_url = ""
             if cfg.logo:
-                logo_url = f"{public_api_base()}{cfg.logo.url}"
+                logo_url = absolute_media_url(cfg.logo.url, request) or ""
             results.append(
                 {
                     "provider_type": cfg.provider_type,

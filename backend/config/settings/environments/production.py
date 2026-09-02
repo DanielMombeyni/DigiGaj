@@ -2,7 +2,7 @@ DEBUG = False
 
 import os
 
-from app.utils.deploy_env import build_deploy_config
+from app.utils.deploy_env import build_deploy_config, is_placeholder_public_url
 
 _auto = os.environ.get("AUTO_DEPLOY_CONFIG", "1").strip().lower() not in ("0", "false", "no", "off")
 _deploy = build_deploy_config() if _auto else None
@@ -11,9 +11,9 @@ if _deploy:
     ALLOWED_HOSTS = list(dict.fromkeys([*_deploy["allowed_hosts"], *ALLOWED_HOSTS]))
     CORS_ALLOWED_ORIGINS = list(dict.fromkeys([*_deploy["cors_origins"], *CORS_ALLOWED_ORIGINS]))
     CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([*_deploy["csrf_origins"], *CSRF_TRUSTED_ORIGINS]))
-    if not os.environ.get("FRONTEND_URL", "").strip():
+    if is_placeholder_public_url(os.environ.get("FRONTEND_URL", "")):
         FRONTEND_URL = _deploy["frontend_url"]
-    if not os.environ.get("PUBLIC_API_BASE", "").strip():
+    if is_placeholder_public_url(os.environ.get("PUBLIC_API_BASE", "")):
         PUBLIC_API_BASE = _deploy["public_api_base"]
     _tls_env = os.environ.get("TLS_ENABLED", "").strip().lower()
     if _tls_env in ("1", "true", "yes"):
@@ -28,6 +28,7 @@ else:
     TLS_ENABLED = False
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"

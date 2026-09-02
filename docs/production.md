@@ -31,9 +31,11 @@
 flowchart LR
   User[کاربر / Cloudflare] --> Proxy[proxy :80 / :443]
   Proxy -->|"/"| Frontend[frontend React]
-  Proxy -->|"/api/* /media/* /admin/*"| Backend[backend Daphne :8000]
+  Proxy -->|"/api/* /admin/* /static/*"| Backend[backend Daphne :8000]
+  Proxy -->|"/media/*"| Media[(media_prod)]
   Backend --> DB[(PostgreSQL)]
   Backend --> Redis[(Redis)]
+  Backend --> Media
   Celery[celery + beat] --> Redis
   Celery --> DB
 ```
@@ -111,8 +113,8 @@ POSTGRES_PASSWORD=<رمز-قوی-دیتابیس>
 | `POSTGRES_PASSWORD` | رمز PostgreSQL | **الزامی — قوی** |
 | `SITE_DOMAIN` | دامنه سایت | `digigadg.com` (پیش‌فرض در compose) |
 | `AUTO_DEPLOY_CONFIG` | تشخیص خودکار IP/دامنه | `1` (در compose) |
-| `PUBLIC_API_BASE` | آدرس عمومی API | معمولاً خودکار — در صورت نیاز دستی |
-| `FRONTEND_URL` | آدرس فرانت | معمولاً خودکار |
+| `PUBLIC_API_BASE` | آدرس عمومی API و تصاویر | خودکار از دامنه — مقدار `localhost` در production نادیده گرفته می‌شود |
+| `FRONTEND_URL` | آدرس فرانت | معمولاً خودکار — `localhost` در production نادیده گرفته می‌شود |
 | `TLS_ENABLED` | HTTPS فعال | خودکار اگر گواهی SSL باشد |
 
 متغیرهای اختیاری:
@@ -382,6 +384,18 @@ cat backup.sql | docker compose -f docker-compose.prod.yml exec -T db \
 
 - پورت 80/443 روی سرور باز باشد
 - Cloudflare Proxy نباید پورت اشتباه forward کند
+
+### تصاویر آپلودشده لود نمی‌شوند
+
+در Production فایل‌های `/media/` را **nginx** از volume `media_prod` سرو می‌کند، نه Django.
+
+```bash
+./docker.sh Production restart proxy
+curl -I https://digigadg.com/media/products/<filename>
+```
+
+- پاسخ باید `200` باشد، نه `404`
+- اگر `.env` از example کپی شده و `PUBLIC_API_BASE=http://localhost:8000` مانده، بعد از به‌روزرسانی backend آن را با دامنه جایگزین می‌کند — یک‌بار `./docker.sh Production restart backend` بزنید
 
 ### خطای DisallowedHost
 

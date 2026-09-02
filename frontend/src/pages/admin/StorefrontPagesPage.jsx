@@ -23,6 +23,7 @@ import { AdminPageHeader, AdminCard, AdminStatCard } from '@/components/dashboar
 import { invalidateStorefrontConfig } from '@/services/storefrontConfig'
 import { applyThemeToDocument } from '@/config/theme'
 import { brand } from '@/config/brand'
+import { mediaSrc } from '@/utils/media'
 
 const TAB_GENERAL = '__general__'
 const TAB_COLORS = '__colors__'
@@ -466,7 +467,7 @@ export default function AdminStorefrontPagesPage() {
                   <div className="flex flex-wrap items-start gap-5">
                     <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-mist-200 bg-white shadow-soft">
                       {iconPreview ? (
-                        <img src={iconPreview} alt="" className="h-full w-full object-contain p-2" />
+                        <img src={mediaSrc(iconPreview)} alt="" className="h-full w-full object-contain p-2" />
                       ) : (
                         <ImageIcon className="h-8 w-8 text-ink-700/25" strokeWidth={1.5} />
                       )}
@@ -665,7 +666,7 @@ export default function AdminStorefrontPagesPage() {
                     <div className="flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-transparent text-white">
                       {heroImagePreview ? (
                         <div className="relative min-h-0 flex-1">
-                          <img src={heroImagePreview} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                          <img src={mediaSrc(heroImagePreview)} alt="" className="absolute inset-0 h-full w-full object-cover" />
                         </div>
                       ) : (
                         <div className="relative flex min-h-0 flex-1 items-center justify-center bg-white/5 text-sm text-white/30">

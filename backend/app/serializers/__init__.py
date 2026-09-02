@@ -16,16 +16,8 @@ from app.models import (
     SitePage,
     SiteSetting,
 )
-from app.payment.utils import public_api_base
+from app.payment.utils import absolute_media_url as _abs_media
 from app.services.product_options_service import ProductOptionsService
-
-
-def _abs_media(url, request=None):
-    if not url:
-        return None
-    if str(url).startswith("http"):
-        return url
-    return f"{public_api_base()}{url}"
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -44,13 +36,11 @@ class CategorySerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if instance.image:
-            from app.payment.utils import public_api_base
-
-            url = instance.image.url
-            data["image"] = url if url.startswith("http") else f"{public_api_base()}{url}"
-        else:
-            data["image"] = None
+        data["image"] = (
+            _abs_media(instance.image.url, self.context.get("request"))
+            if instance.image
+            else None
+        )
         return data
 
 

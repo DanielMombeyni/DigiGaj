@@ -8,7 +8,7 @@ from django.core.files.storage import default_storage
 from rest_framework.exceptions import ValidationError
 
 from app.models import SitePage, SiteSetting
-from app.payment.utils import public_api_base
+from app.payment.utils import absolute_media_url
 from app.services.home_content import (
     ensure_store_defaults,
     get_home_hero,
@@ -60,19 +60,7 @@ DEFAULT_PUBLIC_PAGES = {
 
 
 def media_url(path: str | None) -> str | None:
-    if not path:
-        return None
-    text = str(path).strip()
-    if not text:
-        return None
-    if text.startswith("http"):
-        return text
-    base = public_api_base()
-    if text.startswith("/media/"):
-        return f"{base}{text}"
-    if text.startswith("/"):
-        return f"{base}{text}"
-    return f"{base}/media/{text.lstrip('/')}"
+    return absolute_media_url(path)
 
 
 def _storage_path(path: str | None) -> str | None:

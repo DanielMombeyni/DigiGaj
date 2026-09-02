@@ -3,6 +3,7 @@ import { adminApi } from '@/services/api'
 import { AdminPageHeader, AdminTable, AdminEditButton, AdminDeleteButton } from '@/components/dashboard/AdminUI'
 import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/dashboard/AdminModal'
 import { useConfirm } from '@/components/common/ConfirmProvider'
+import { mediaSrc } from '@/utils/media'
 
 const empty = { name: '', slug: '', description: '', is_active: true, sort_order: 0 }
 
@@ -105,7 +106,7 @@ export default function AdminCategoriesPage() {
             <td className="px-4 py-3">
               {c.image ? (
                 <img
-                  src={c.image}
+                  src={mediaSrc(c.image)}
                   alt={c.name}
                   className="h-10 w-10 rounded-xl object-cover border border-mist-200 bg-mist-50"
                 />
@@ -167,7 +168,7 @@ export default function AdminCategoriesPage() {
             <div className="mt-1 flex flex-wrap items-center gap-4">
               <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border border-mist-200 bg-mist-50">
                 {imagePreview ? (
-                  <img src={imagePreview} alt="" className="h-full w-full object-cover" />
+                  <img src={mediaSrc(imagePreview)} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-xs text-ink-700/35">بدون تصویر</span>
                 )}

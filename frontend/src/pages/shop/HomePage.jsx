@@ -7,6 +7,7 @@ import Seo, { organizationJsonLd } from '@/components/common/Seo'
 import BrandLogo from '@/components/common/BrandLogo'
 import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
+import { mediaSrc } from '@/utils/media'
 
 const BENEFITS = [
   {
@@ -135,7 +136,7 @@ export default function HomePage() {
               {heroImage ? (
                 <div className="relative min-h-0 flex-1">
                   <img
-                    src={heroImage}
+                    src={mediaSrc(heroImage)}
                     alt=""
                     className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
@@ -224,7 +225,7 @@ export default function HomePage() {
                 <div className="aspect-[4/3] overflow-hidden bg-white/5">
                   {c.image ? (
                     <img
-                      src={c.image}
+                      src={mediaSrc(c.image)}
                       alt={c.name}
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       loading="lazy"

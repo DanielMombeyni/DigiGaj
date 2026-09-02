@@ -38,6 +38,8 @@ services:
       DJANGO_DEBUG: "False"
       AUTO_DEPLOY_CONFIG: "1"
       SITE_DOMAIN: digigadg.com
+      PUBLIC_API_BASE: https://digigadg.com
+      FRONTEND_URL: https://digigadg.com
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
@@ -77,6 +79,8 @@ services:
       DJANGO_ENV: production
       AUTO_DEPLOY_CONFIG: "1"
       SITE_DOMAIN: digigadg.com
+      PUBLIC_API_BASE: https://digigadg.com
+      FRONTEND_URL: https://digigadg.com
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
@@ -99,6 +103,8 @@ services:
       DJANGO_ENV: production
       AUTO_DEPLOY_CONFIG: "1"
       SITE_DOMAIN: digigadg.com
+      PUBLIC_API_BASE: https://digigadg.com
+      FRONTEND_URL: https://digigadg.com
       POSTGRES_HOST: db
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
@@ -127,6 +133,7 @@ services:
       - ./deploy/nginx/entrypoint.sh:/entrypoint.sh:ro
       - ./deploy/ssl:/etc/ssl/cloudflare:ro
       - ./deploy/ssl:/ssl:ro
+      - media_prod:/srv/media:ro
     ports:
       - "80:80"
       - "443:443"

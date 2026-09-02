@@ -27,6 +27,14 @@ CERT_KEY_PAIRS = (
 )
 
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "backend", "frontend", "proxy"}
+_PLACEHOLDER_PUBLIC_URL_MARKERS = ("localhost", "127.0.0.1", "0.0.0.0")
+
+
+def is_placeholder_public_url(value: str | None) -> bool:
+    text = (value or "").strip().lower()
+    if not text:
+        return True
+    return any(marker in text for marker in _PLACEHOLDER_PUBLIC_URL_MARKERS)
 
 
 def _truthy(value: str | None, default: bool = True) -> bool:
@@ -210,8 +218,14 @@ def build_deploy_config() -> dict:
     primary = primary.replace("https://", "").replace("http://", "").split("/")[0].split(":")[0]
 
     scheme = "https" if tls_enabled else "http"
-    public_api_base = os.environ.get("PUBLIC_API_BASE", "").strip() or f"{scheme}://{primary}"
-    frontend_url = os.environ.get("FRONTEND_URL", "").strip() or f"{scheme}://{primary}"
+    env_api_base = os.environ.get("PUBLIC_API_BASE", "").strip()
+    env_frontend = os.environ.get("FRONTEND_URL", "").strip()
+    public_api_base = (
+        f"{scheme}://{primary}" if is_placeholder_public_url(env_api_base) else env_api_base
+    )
+    frontend_url = (
+        f"{scheme}://{primary}" if is_placeholder_public_url(env_frontend) else env_frontend
+    )
 
     cors_origins: list[str] = []
     csrf_origins: list[str] = []
@@ -270,7 +284,9 @@ def apply_deploy_env_overrides() -> dict:
         "DEPLOY_PUBLIC_IP": cfg["public_ip"],
         "SITE_DOMAIN": cfg.get("site_domain") or SITE_DOMAIN,
     }
+    placeholder_keys = {"PUBLIC_API_BASE", "FRONTEND_URL"}
     for key, value in mapping.items():
-        if not os.environ.get(key, "").strip():
+        current = os.environ.get(key, "").strip()
+        if not current or (key in placeholder_keys and is_placeholder_public_url(current)):
             os.environ[key] = value
     return cfg

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { brand } from '@/config/brand'
+import { mediaSrc } from '@/utils/media'
 
 const DEFAULT_DESC = brand.defaultDescription
 
@@ -38,7 +39,8 @@ export default function Seo({
     upsert('property', 'og:description', description)
     upsert('property', 'og:type', type)
     upsert('property', 'og:url', url)
-    upsert('property', 'og:image', image.startsWith('http') ? image : `${window.location.origin}${image}`)
+    const ogImage = mediaSrc(image) || image
+    upsert('property', 'og:image', ogImage.startsWith('http') ? ogImage : `${window.location.origin}${ogImage}`)
     upsert('property', 'og:locale', 'fa_IR')
     upsert('property', 'og:site_name', brand.name)
     upsert('name', 'twitter:card', 'summary_large_image')

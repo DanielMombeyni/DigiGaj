@@ -13,6 +13,7 @@ import { shopApi, paymentApi, accountApi } from '@/services/api'
 import { useCartStore } from '@/store/cart'
 import { useAuthStore } from '@/store/auth'
 import { toman, faDigits } from '@/utils/format'
+import { mediaSrc } from '@/utils/media'
 import Seo from '@/components/common/Seo'
 
 const emptyAddressForm = {
@@ -770,7 +771,7 @@ export default function CheckoutPage() {
                         />
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-mist-200 bg-white">
                           {logo ? (
-                            <img src={logo} alt="" className="h-full w-full object-contain" />
+                            <img src={mediaSrc(logo)} alt="" className="h-full w-full object-contain" />
                           ) : (
                             <span className="text-[9px] text-ink-700/35">PG</span>
                           )}
@@ -823,7 +824,7 @@ export default function CheckoutPage() {
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
                       {thumb ? (
                         <img
-                          src={thumb}
+                          src={mediaSrc(thumb)}
                           alt=""
                           className="h-full w-full object-cover"
                           loading="lazy"

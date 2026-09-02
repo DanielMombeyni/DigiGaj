@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from django.conf import settings
 
 
@@ -9,6 +11,22 @@ def toman_to_rial(amount_toman: int) -> int:
 
 def public_api_base() -> str:
     return getattr(settings, "PUBLIC_API_BASE", "http://localhost:8000").rstrip("/")
+
+
+def _media_path(url: str) -> str:
+    text = str(url).strip()
+    if text.startswith("http://") or text.startswith("https://"):
+        text = urlparse(text).path or text
+    if not text.startswith("/"):
+        text = f"/media/{text.lstrip('/')}"
+    return text
+
+
+def absolute_media_url(url: str | None, request=None) -> str | None:
+    """Same-origin /media/... path. Never returns localhost or http URLs."""
+    if not url:
+        return None
+    return _media_path(url)
 
 
 def callback_url_for(provider: str, tracking: str) -> str:

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus, X, ImagePlus } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { toman } from '@/utils/format'
+import { mediaSrc } from '@/utils/media'
 import { AdminPageHeader, AdminTable, AdminEditButton, AdminDeleteButton } from '@/components/dashboard/AdminUI'
 import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/dashboard/AdminModal'
 import { useConfirm } from '@/components/common/ConfirmProvider'
@@ -579,7 +580,7 @@ export default function AdminProductsPage() {
             <div className="flex flex-wrap gap-3">
               {existingImages.map((img) => (
                 <div key={img.id} className="relative h-20 w-20 overflow-hidden rounded-xl border border-mist-200">
-                  <img src={img.image} alt="" className="h-full w-full object-cover" />
+                  <img src={mediaSrc(img.image)} alt="" className="h-full w-full object-cover" />
                   <button
                     type="button"
                     className="absolute left-1 top-1 rounded-md bg-ink-950/70 p-0.5 text-white"

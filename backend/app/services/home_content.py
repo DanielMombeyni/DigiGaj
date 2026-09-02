@@ -8,7 +8,7 @@ from django.core.files.storage import default_storage
 from rest_framework.exceptions import ValidationError
 
 from app.models import SiteSetting
-from app.payment.utils import public_api_base
+from app.payment.utils import absolute_media_url
 
 STORE_KEY = "store"
 HERO_IMAGE_UPLOAD = "home-hero/"
@@ -43,19 +43,7 @@ def _normalize(raw: dict | None) -> dict:
 
 
 def hero_image_url(path: str | None) -> str | None:
-    if not path:
-        return None
-    text = str(path).strip()
-    if not text:
-        return None
-    if text.startswith("http"):
-        return text
-    base = public_api_base()
-    if text.startswith("/media/"):
-        return f"{base}{text}"
-    if text.startswith("/"):
-        return f"{base}{text}"
-    return f"{base}/media/{text.lstrip('/')}"
+    return absolute_media_url(path)
 
 
 def _storage_path(path: str | None) -> str | None:

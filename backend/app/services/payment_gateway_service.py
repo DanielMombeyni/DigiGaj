@@ -7,7 +7,7 @@ from django.db import transaction
 
 from app.models import PaymentGatewayConfig
 from app.payment.registry import get_driver, list_catalog
-from app.payment.utils import is_masked_value, mask_secret, public_api_base
+from app.payment.utils import absolute_media_url, is_masked_value, mask_secret
 
 logger = logging.getLogger("app.payment")
 
@@ -16,12 +16,9 @@ def _logo_url(cfg: PaymentGatewayConfig, request=None) -> str:
     if not cfg.logo:
         return ""
     try:
-        path = cfg.logo.url
+        return absolute_media_url(cfg.logo.url, request) or ""
     except Exception:
         return ""
-    if path.startswith("http"):
-        return path
-    return f"{public_api_base()}{path}"
 
 
 class PaymentGatewayService:

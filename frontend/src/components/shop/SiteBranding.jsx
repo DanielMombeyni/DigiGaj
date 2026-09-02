@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { getStorefrontConfig } from '@/services/storefrontConfig'
+import { mediaSrc } from '@/utils/media'
 
 function upsertLink(rel, href, type) {
   if (!href) return
@@ -28,9 +29,9 @@ export default function SiteBranding() {
           : lower.endsWith('.ico')
             ? 'image/x-icon'
             : undefined
-        upsertLink('icon', icon, type)
-        upsertLink('shortcut icon', icon, type)
-        upsertLink('apple-touch-icon', icon)
+        upsertLink('icon', mediaSrc(icon) || icon, type)
+        upsertLink('shortcut icon', mediaSrc(icon) || icon, type)
+        upsertLink('apple-touch-icon', mediaSrc(icon) || icon)
       })
       .catch(() => {})
     return () => {

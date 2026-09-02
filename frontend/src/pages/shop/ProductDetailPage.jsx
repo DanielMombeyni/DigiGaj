@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { shopApi } from '@/services/api'
 import { useCartStore } from '@/store/cart'
 import { toman } from '@/utils/format'
+import { mediaSrc } from '@/utils/media'
 import Seo, { productJsonLd } from '@/components/common/Seo'
 import Reveal from '@/components/common/Reveal'
 import ProductGridSection from '@/components/shop/ProductGridSection'
@@ -103,7 +104,7 @@ export default function ProductDetailPage() {
         title={product.name}
         description={product.short_description || product.description || `خرید ${product.name} از ${brand.name}`}
         path={`/products/${product.slug}`}
-        image={image || '/vite.svg'}
+        image={mediaSrc(image) || '/vite.svg'}
         type="product"
         jsonLd={productJsonLd(product)}
       />
@@ -113,7 +114,7 @@ export default function ProductDetailPage() {
         <Reveal className="overflow-hidden rounded-[2rem] border border-mist-200 bg-gradient-to-br from-ink-950 via-ink-900 to-sea-600/30 shadow-soft">
           <div className="aspect-square">
             {image ? (
-              <img src={image} alt={product.name} className="h-full w-full object-cover" />
+              <img src={mediaSrc(image)} alt={product.name} className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-white/80">
                 <span className="font-display text-5xl font-bold">{product.name.slice(0, 1)}</span>
@@ -133,7 +134,7 @@ export default function ProductDetailPage() {
                   activeImage === img.image ? 'border-copper-500' : 'border-mist-200'
                 }`}
               >
-                <img src={img.image} alt="" className="h-full w-full object-cover" />
+                <img src={mediaSrc(img.image)} alt="" className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

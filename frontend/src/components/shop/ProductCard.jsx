@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { toman } from '@/utils/format'
+import { mediaSrc } from '@/utils/media'
 import { useCartStore } from '@/store/cart'
 import BrandLogo from '@/components/common/BrandLogo'
 
@@ -23,7 +24,7 @@ export function ProductCard({ product, index = 0 }) {
       <Link to={`/products/${product.slug}`} className="relative block aspect-[4/3] overflow-hidden bg-gradient-to-br from-ink-950 via-ink-900 to-sea-600/40">
         {product.primary_image ? (
           <img
-            src={product.primary_image}
+            src={mediaSrc(product.primary_image)}
             alt={product.name}
             loading="lazy"
             className="h-full w-full object-cover transition duration-700 group-hover:scale-110"

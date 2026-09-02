@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { shopApi } from '@/services/api'
+import { mediaSrc } from '@/utils/media'
 import Seo from '@/components/common/Seo'
 import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
@@ -46,7 +47,7 @@ export default function CategoriesPage() {
               <div className="aspect-[16/10] overflow-hidden bg-mist-50">
                 {c.image ? (
                   <img
-                    src={c.image}
+                    src={mediaSrc(c.image)}
                     alt={c.name}
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     loading="lazy"
