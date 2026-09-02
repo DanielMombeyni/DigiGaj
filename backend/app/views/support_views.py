@@ -146,6 +146,9 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
             is_staff_reply=False,
             body=data["message"].strip(),
         )
+        from app.services.email_dispatch import queue_mail_event
+
+        queue_mail_event("ticket_created", "ticket", ticket.pk)
         return Response(
             {
                 "ticket_number": ticket.ticket_number,
@@ -186,5 +189,13 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
         new_status = ser.validated_data.get("status") or SupportTicket.Status.ANSWERED
         ticket.status = new_status
         ticket.save(update_fields=["status", "updated_at"])
+        from app.services.email_dispatch import queue_mail_event
+
+        queue_mail_event(
+            "ticket_replied",
+            "ticket",
+            ticket.pk,
+            {"message": body[:2000]},
+        )
         ticket = self.get_queryset().prefetch_related("messages__author").get(pk=ticket.pk)
         return Response(SupportTicketDetailSerializer(ticket).data)

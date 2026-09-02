@@ -112,7 +112,7 @@ export default function AdminCustomersPage() {
       />
 
       {listLoading ? (
-        <div className="h-40 animate-pulse rounded-2xl bg-white" />
+        <div className="h-40 animate-pulse rounded-2xl bg-surface" />
       ) : (
         <AdminTable columns={['کاربر', 'تماس', 'وضعیت', 'تاریخ عضویت', '']}>
           {items.map((u) => (

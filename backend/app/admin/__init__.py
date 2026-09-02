@@ -24,6 +24,7 @@ from app.models import (
     TicketMessage,
     StaffRole,
     UserProfile,
+    EmailTemplate,
 )
 
 User = get_user_model()
@@ -167,6 +168,13 @@ class SiteSettingAdmin(admin.ModelAdmin):
 class SmsProviderConfigAdmin(admin.ModelAdmin):
     list_display = ("display_name", "provider_type", "is_enabled", "sort_order")
     list_filter = ("is_enabled", "provider_type")
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "event", "is_enabled", "is_builtin", "updated_at")
+    list_filter = ("event", "is_enabled", "is_builtin")
+    search_fields = ("name", "key", "subject")
 
 
 class TicketMessageInline(admin.TabularInline):

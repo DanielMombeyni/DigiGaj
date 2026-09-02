@@ -17,6 +17,7 @@ from .customer_address import CustomerAddress, MAX_CUSTOMER_ADDRESSES
 from .sms_provider import SmsProviderConfig
 from .staff import StaffRole
 from .support import SupportTicket, TicketMessage
+from .email import EmailTemplate
 
 __all__ = [
     "Category",
@@ -42,4 +43,5 @@ __all__ = [
     "StaffRole",
     "SupportTicket",
     "TicketMessage",
+    "EmailTemplate",
 ]

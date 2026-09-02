@@ -48,3 +48,18 @@ export function invalidateStorefrontConfig() {
     }
   }
 }
+
+export function subscribeStorefrontConfig(onChange) {
+  if (typeof window === 'undefined') return () => {}
+  const onInvalidate = () => onChange()
+  const onStorage = (event) => {
+    if (event.key !== CONFIG_STORAGE_KEY) return
+    onInvalidate()
+  }
+  window.addEventListener(CONFIG_EVENT, onInvalidate)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(CONFIG_EVENT, onInvalidate)
+    window.removeEventListener('storage', onStorage)
+  }
+}

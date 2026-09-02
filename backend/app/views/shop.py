@@ -219,8 +219,18 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         valid = {c.value for c in Order.Status}
         if next_status not in valid:
             return Response({"detail": "وضعیت نامعتبر است"}, status=400)
-        order.status = next_status
-        order.save(update_fields=["status", "updated_at"])
+        previous = order.status
+        if previous != next_status:
+            order.status = next_status
+            order.save(update_fields=["status", "updated_at"])
+            from app.services.email_dispatch import queue_mail_event
+
+            queue_mail_event(
+                "order_status_changed",
+                "order",
+                order.pk,
+                {"previous_status": previous},
+            )
         return Response(OrderSerializer(order, context={"request": request}).data)
 
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])

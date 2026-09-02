@@ -14,6 +14,7 @@ ADMIN_PAGES = (
     ("personnel", "پرسنل و نقش‌ها"),
     ("customers", "مشتریان"),
     ("storefront", "صفحات فروشگاه"),
+    ("emails", "ایمیل‌ها"),
 )
 
 ADMIN_PAGE_KEYS = frozenset(k for k, _ in ADMIN_PAGES)

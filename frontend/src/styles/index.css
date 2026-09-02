@@ -31,6 +31,8 @@
   --color-mist-100-rgb: 238 241 245;
   --color-mist-200: #dce3ec;
   --color-mist-200-rgb: 220 227 236;
+  --color-surface: #ffffff;
+  --color-surface-rgb: 255 255 255;
   --brand: var(--color-copper-500);
   --ink: var(--color-ink-950);
   --mist: var(--color-mist-50);
@@ -47,6 +49,8 @@
 
 html[data-theme='dark'] {
   color-scheme: dark;
+  --color-surface: var(--color-mist-100);
+  --color-surface-rgb: var(--color-mist-100-rgb);
   --hero-mesh: radial-gradient(ellipse 80% 60% at 70% 20%, color-mix(in srgb, var(--color-copper-400) 22%, transparent), transparent 55%),
     radial-gradient(ellipse 60% 50% at 10% 80%, color-mix(in srgb, var(--color-sea-400) 18%, transparent), transparent 50%),
     linear-gradient(165deg, #05070c 0%, #0b1220 45%, #111827 100%);
@@ -80,16 +84,16 @@ body {
     @apply btn bg-copper-500 text-white hover:bg-copper-600 shadow-soft;
   }
   .btn-secondary {
-    @apply btn border border-mist-200 bg-white text-ink-900 hover:border-copper-400 hover:bg-mist-50;
+    @apply btn border border-mist-200 bg-surface text-ink-900 hover:border-copper-400 hover:bg-mist-50;
   }
   .btn-ghost {
     @apply btn border border-white/20 bg-white/5 text-white hover:bg-white/10;
   }
   .btn-dark {
-    @apply btn bg-ink-900 text-white hover:bg-ink-800;
+    @apply btn bg-ink-900 text-mist-50 hover:bg-ink-800;
   }
   .input {
-    @apply w-full max-w-full min-w-0 rounded-xl border border-mist-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-sea-400 focus:ring-2 focus:ring-sea-400/20;
+    @apply w-full max-w-full min-w-0 rounded-xl border border-mist-200 bg-surface px-4 py-2.5 text-sm text-ink-900 outline-none transition focus:border-sea-400 focus:ring-2 focus:ring-sea-400/20;
   }
   .select-field {
     @apply input w-full min-w-0 max-w-full cursor-pointer truncate text-start;

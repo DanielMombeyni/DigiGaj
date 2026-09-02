@@ -100,4 +100,8 @@ export function applyThemeToDocument(theme, colors = {}) {
     root.style.setProperty(`${cssVar}-rgb`, hexToRgbChannels(hex))
   })
   root.style.setProperty('--brand', resolved.copper_500)
+
+  const surfaceHex = themeId === 'dark' ? resolved.mist_100 : '#ffffff'
+  root.style.setProperty('--color-surface', surfaceHex)
+  root.style.setProperty('--color-surface-rgb', hexToRgbChannels(surfaceHex))
 }

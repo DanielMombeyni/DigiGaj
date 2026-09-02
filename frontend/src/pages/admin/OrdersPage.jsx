@@ -119,7 +119,7 @@ export default function AdminOrdersPage() {
       )}
 
       {loading ? (
-        <div className="h-40 animate-pulse rounded-2xl bg-white" />
+        <div className="h-40 animate-pulse rounded-2xl bg-surface" />
       ) : (
         <AdminTable columns={['کد پیگیری', 'مشتری', 'تماس', 'مبلغ', 'وضعیت']}>
           {orders.map((o) => (

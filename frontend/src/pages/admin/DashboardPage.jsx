@@ -61,7 +61,7 @@ export default function AdminDashboard() {
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-28 animate-pulse rounded-2xl bg-white" />
+            <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface" />
           ))}
         </div>
       ) : (
@@ -87,6 +87,7 @@ export default function AdminDashboard() {
               [`${PANEL_BASE}/tickets`, 'پشتیبانی'],
               [`${PANEL_BASE}/transactions`, 'تراکنش‌ها'],
               [`${PANEL_BASE}/settings`, 'تنظیمات فروشگاه'],
+              [`${PANEL_BASE}/emails`, 'ایمیل‌ها'],
             ].map(([to, label]) => (
               <Link
                 key={to}

@@ -24,6 +24,14 @@ from app.views.sms_views import (
     AdminSmsProviderDetailView,
     AdminSmsProviderListView,
 )
+from app.views.email_views import (
+    AdminEmailSmtpTestView,
+    AdminEmailSmtpView,
+    AdminEmailTemplateCatalogView,
+    AdminEmailTemplateDetailView,
+    AdminEmailTemplateListView,
+    AdminEmailTemplateTestView,
+)
 from app.views.support_views import SupportTicketViewSet
 from app.views.personnel_views import (
     AdminPagesCatalogView,
@@ -73,6 +81,24 @@ urlpatterns = [
         "admin/sms-providers/<int:pk>/",
         AdminSmsProviderDetailView.as_view(),
         name="admin-sms-detail",
+    ),
+    path("admin/email-smtp/", AdminEmailSmtpView.as_view(), name="admin-email-smtp"),
+    path("admin/email-smtp/test/", AdminEmailSmtpTestView.as_view(), name="admin-email-smtp-test"),
+    path(
+        "admin/email-templates/catalog/",
+        AdminEmailTemplateCatalogView.as_view(),
+        name="admin-email-templates-catalog",
+    ),
+    path("admin/email-templates/", AdminEmailTemplateListView.as_view(), name="admin-email-templates"),
+    path(
+        "admin/email-templates/<int:pk>/test/",
+        AdminEmailTemplateTestView.as_view(),
+        name="admin-email-template-test",
+    ),
+    path(
+        "admin/email-templates/<int:pk>/",
+        AdminEmailTemplateDetailView.as_view(),
+        name="admin-email-template-detail",
     ),
     path("auth/otp/request/", request_otp, name="otp-request"),
     path("auth/otp/verify/", verify_otp, name="otp-verify"),

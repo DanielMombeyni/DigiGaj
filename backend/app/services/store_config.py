@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from rest_framework.exceptions import ValidationError
 
 from app.models import SiteSetting
@@ -18,9 +20,25 @@ DEFAULT_AUTH_METHODS = {
 DEFAULT_CONFIG = {
     "auth_methods": dict(DEFAULT_AUTH_METHODS),
     "company_phone": "",
+    "company_email": "",
     "company_address": "",
     "enamad_html": "",
 }
+
+
+def _optional_text(value) -> str:
+    return str(value or "").strip()
+
+
+def _optional_email(value) -> str:
+    email = _optional_text(value)
+    if not email:
+        return ""
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        raise ValidationError({"company_email": "ایمیل شرکت نامعتبر است."})
+    return email
 
 
 def _normalize(raw: dict | None) -> dict:
@@ -34,9 +52,10 @@ def _normalize(raw: dict | None) -> dict:
             if key in auth:
                 data["auth_methods"][key] = bool(auth[key])
 
-    data["company_phone"] = str(raw.get("company_phone") or "").strip()
-    data["company_address"] = str(raw.get("company_address") or "").strip()
-    data["enamad_html"] = str(raw.get("enamad_html") or "").strip()
+    data["company_phone"] = _optional_text(raw.get("company_phone"))
+    data["company_email"] = _optional_text(raw.get("company_email"))
+    data["company_address"] = _optional_text(raw.get("company_address"))
+    data["enamad_html"] = _optional_text(raw.get("enamad_html"))
     return data
 
 
@@ -121,6 +140,8 @@ def public_storefront_config() -> dict:
     }
     if cfg["company_phone"]:
         out["company_phone"] = cfg["company_phone"]
+    if cfg["company_email"]:
+        out["company_email"] = cfg["company_email"]
     if cfg["company_address"]:
         out["company_address"] = cfg["company_address"]
     return out
@@ -133,9 +154,10 @@ def save_storefront_config(payload: dict) -> dict:
     auth = validate_auth_methods(payload.get("auth_methods") or {})
     value = {
         "auth_methods": auth,
-        "company_phone": str(payload.get("company_phone") or "").strip(),
-        "company_address": str(payload.get("company_address") or "").strip(),
-        "enamad_html": str(payload.get("enamad_html") or "").strip(),
+        "company_phone": _optional_text(payload.get("company_phone")),
+        "company_email": _optional_email(payload.get("company_email")),
+        "company_address": _optional_text(payload.get("company_address")),
+        "enamad_html": _optional_text(payload.get("enamad_html")),
     }
     SiteSetting.objects.update_or_create(
         key=STOREFRONT_KEY,

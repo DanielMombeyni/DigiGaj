@@ -21,6 +21,7 @@ FULL_STAFF_PAGES = [
     "personnel",
     "customers",
     "storefront",
+    "emails",
 ]
 
 BOOTSTRAP_USERNAME = "daniel"
@@ -149,6 +150,7 @@ class Command(BaseCommand):
                     "value": {
                         "auth_methods": auth_methods,
                         "company_phone": "",
+                        "company_email": "",
                         "company_address": "",
                         "enamad_html": "",
                     }

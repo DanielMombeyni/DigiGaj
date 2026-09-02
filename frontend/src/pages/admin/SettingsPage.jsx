@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { KeyRound, Building2, ShieldCheck, MessageSquare } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { KeyRound, Building2, ShieldCheck, MessageSquare, Mail } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { useConfirm } from '@/components/common/ConfirmProvider'
 import { AdminPageHeader, AdminTable, AdminEditButton, AdminDeleteButton } from '@/components/dashboard/AdminUI'
 import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/dashboard/AdminModal'
+import { invalidateStorefrontConfig } from '@/services/storefrontConfig'
+import { PANEL_BASE } from '@/config/panel'
 
 const TABS = [
   { id: 'auth', label: 'ورود مشتریان', icon: KeyRound },
   { id: 'company', label: 'اطلاعات شرکت', icon: Building2 },
   { id: 'enamad', label: 'اینماد', icon: ShieldCheck },
+  { id: 'email', label: 'ایمیل', icon: Mail },
   { id: 'sms', label: 'سرویس پیامک', icon: MessageSquare },
 ]
 
@@ -43,8 +47,23 @@ const empty = () => ({
     phone_otp: false,
   },
   company_phone: '',
+  company_email: '',
   company_address: '',
   enamad_html: '',
+})
+
+const emptySmtp = () => ({
+  enabled: false,
+  host: '',
+  port: 587,
+  username: '',
+  password: '',
+  use_tls: true,
+  use_ssl: false,
+  from_email: '',
+  from_name: '',
+  timeout: 20,
+  is_ready: false,
 })
 
 function CredentialFields({ schema, creds, setCreds }) {
@@ -99,6 +118,10 @@ export default function AdminSettingsPage() {
   const [smsCreds, setSmsCreds] = useState({})
   const [smsName, setSmsName] = useState('')
   const [smsBusy, setSmsBusy] = useState(false)
+  const [smtp, setSmtp] = useState(emptySmtp)
+  const [smtpLoading, setSmtpLoading] = useState(false)
+  const [testTo, setTestTo] = useState('')
+  const [testBusy, setTestBusy] = useState(false)
 
   const availableSmsDrivers = useMemo(
     () => smsCatalog.filter((d) => !d.already_added),
@@ -165,12 +188,71 @@ export default function AdminSettingsPage() {
     }
   }
 
+  const loadSmtp = async () => {
+    setSmtpLoading(true)
+    setError('')
+    try {
+      const { data } = await adminApi.emailSmtp.get()
+      setSmtp({ ...emptySmtp(), ...data })
+    } catch {
+      setError('خطا در بارگذاری تنظیمات ایمیل')
+    } finally {
+      setSmtpLoading(false)
+    }
+  }
+
+  const saveSmtp = async (e) => {
+    e?.preventDefault()
+    setError('')
+    setOk('')
+    setSaving(true)
+    try {
+      const { data } = await adminApi.emailSmtp.update({
+        ...smtp,
+        port: Number(smtp.port) || 587,
+        timeout: Number(smtp.timeout) || 20,
+      })
+      setSmtp({ ...emptySmtp(), ...data })
+      setOk('تنظیمات ایمیل ذخیره شد.')
+    } catch (err) {
+      const detail = err.response?.data
+      setError(
+        typeof detail === 'object'
+          ? detail.enabled || detail.from_email || detail.host || detail.detail || JSON.stringify(detail)
+          : err.message || 'خطا در ذخیره',
+      )
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const sendSmtpTest = async (e) => {
+    e.preventDefault()
+    setError('')
+    setOk('')
+    setTestBusy(true)
+    try {
+      await adminApi.emailSmtp.test(testTo.trim())
+      setOk('ایمیل آزمایشی ارسال شد.')
+    } catch (err) {
+      const detail = err.response?.data
+      setError(
+        typeof detail === 'object'
+          ? detail.to || detail.detail || JSON.stringify(detail)
+          : 'ارسال آزمایشی ناموفق بود',
+      )
+    } finally {
+      setTestBusy(false)
+    }
+  }
+
   useEffect(() => {
     load()
   }, [])
 
   useEffect(() => {
     if (tab === 'sms') loadSms()
+    if (tab === 'email') loadSmtp()
   }, [tab])
 
   const activeCount = useMemo(
@@ -196,7 +278,7 @@ export default function AdminSettingsPage() {
 
   const save = async (e) => {
     e?.preventDefault()
-    if (tab === 'sms') return
+    if (tab === 'sms' || tab === 'email') return
     setError('')
     setOk('')
     if (activeCount < 1) {
@@ -213,12 +295,13 @@ export default function AdminSettingsPage() {
         ...data,
         auth_methods: { ...empty().auth_methods, ...data.auth_methods },
       })
+      invalidateStorefrontConfig()
       setOk('تنظیمات ذخیره شد.')
     } catch (err) {
       const detail = err.response?.data
       setError(
         typeof detail === 'object'
-          ? detail.auth_methods || detail.detail || JSON.stringify(detail)
+          ? detail.auth_methods || detail.company_email || detail.detail || JSON.stringify(detail)
           : err.message || 'خطا در ذخیره',
       )
     } finally {
@@ -332,9 +415,18 @@ export default function AdminSettingsPage() {
     <div className="animate-rise space-y-6">
       <AdminPageHeader
         title="تنظیمات فروشگاه"
-        description="ورود مشتریان، اطلاعات شرکت، اینماد و سرویس پیامک"
+        description="ورود مشتریان، اطلاعات شرکت، اینماد، ایمیل و سرویس پیامک"
         actions={
-          tab !== 'sms' ? (
+          tab === 'email' ? (
+            <button
+              type="button"
+              className="btn-primary cursor-pointer"
+              disabled={saving || smtpLoading}
+              onClick={saveSmtp}
+            >
+              {saving ? 'در حال ذخیره...' : 'ذخیره تغییرات'}
+            </button>
+          ) : tab !== 'sms' ? (
             <button
               type="button"
               className="btn-primary cursor-pointer"
@@ -364,7 +456,7 @@ export default function AdminSettingsPage() {
               className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition ${
                 active
                   ? 'bg-ink-950 text-white'
-                  : 'bg-white text-ink-700/70 hover:bg-mist-50 border border-mist-200'
+                  : 'bg-surface text-ink-700/70 hover:bg-mist-50 border border-mist-200'
               }`}
             >
               <Icon className="h-4 w-4" strokeWidth={1.8} />
@@ -380,7 +472,145 @@ export default function AdminSettingsPage() {
         <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{smsError}</p>
       )}
 
-      {tab === 'sms' ? (
+      {tab === 'email' ? (
+        smtpLoading ? (
+          <div className="h-48 animate-pulse rounded-2xl bg-surface" />
+        ) : (
+          <form onSubmit={saveSmtp} className="space-y-4 rounded-2xl border border-mist-200/80 bg-surface p-5 shadow-soft sm:p-6">
+            <p className="text-sm text-ink-700/55">
+              این تنظیمات برای ایمیل‌های فروشگاه (سفارش، تیکت، ثبت‌نام) است. قالب‌ها را در صفحه{' '}
+              <Link to={`${PANEL_BASE}/emails`} className="font-medium text-copper-700 underline underline-offset-2">
+                ایمیل‌ها
+              </Link>{' '}
+              بسازید و فعال کنید.
+            </p>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-mist-200 px-4 py-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={!!smtp.enabled}
+                onChange={(e) => setSmtp({ ...smtp, enabled: e.target.checked })}
+              />
+              <span>
+                <span className="block font-medium text-ink-900">ارسال ایمیل فعال باشد</span>
+                <span className="mt-0.5 block text-xs text-ink-700/45">
+                  تا وقتی خاموش است هیچ قالب تراکنشی ارسال نمی‌شود.
+                </span>
+              </span>
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="label">میزبان SMTP</span>
+                <input
+                  className="input"
+                  dir="ltr"
+                  value={smtp.host}
+                  onChange={(e) => setSmtp({ ...smtp, host: e.target.value })}
+                  placeholder="smtp.example.com"
+                  autoComplete="off"
+                />
+              </label>
+              <label className="block">
+                <span className="label">پورت</span>
+                <input
+                  className="input"
+                  type="number"
+                  dir="ltr"
+                  min={1}
+                  max={65535}
+                  value={smtp.port}
+                  onChange={(e) => setSmtp({ ...smtp, port: e.target.value })}
+                />
+              </label>
+              <label className="block">
+                <span className="label">نام کاربری</span>
+                <input
+                  className="input"
+                  dir="ltr"
+                  value={smtp.username}
+                  onChange={(e) => setSmtp({ ...smtp, username: e.target.value })}
+                  autoComplete="off"
+                />
+              </label>
+              <label className="block">
+                <span className="label">رمز عبور</span>
+                <input
+                  className="input"
+                  type="password"
+                  dir="ltr"
+                  value={smtp.password}
+                  onChange={(e) => setSmtp({ ...smtp, password: e.target.value })}
+                  placeholder={String(smtp.password || '').startsWith('••••') ? 'برای تغییر، مقدار جدید وارد کنید' : ''}
+                  autoComplete="new-password"
+                />
+              </label>
+              <label className="block">
+                <span className="label">ایمیل فرستنده</span>
+                <input
+                  className="input"
+                  type="email"
+                  dir="ltr"
+                  value={smtp.from_email}
+                  onChange={(e) => setSmtp({ ...smtp, from_email: e.target.value })}
+                  placeholder="noreply@example.com"
+                  autoComplete="email"
+                />
+              </label>
+              <label className="block">
+                <span className="label">نام فرستنده</span>
+                <input
+                  className="input"
+                  value={smtp.from_name}
+                  onChange={(e) => setSmtp({ ...smtp, from_name: e.target.value })}
+                  placeholder="فروشگاه"
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!!smtp.use_tls && !smtp.use_ssl}
+                  onChange={(e) => setSmtp({ ...smtp, use_tls: e.target.checked, use_ssl: false })}
+                />
+                TLS (پورت ۵۸۷)
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!!smtp.use_ssl}
+                  onChange={(e) =>
+                    setSmtp({ ...smtp, use_ssl: e.target.checked, use_tls: !e.target.checked })
+                  }
+                />
+                SSL (پورت ۴۶۵)
+              </label>
+            </div>
+            <div className="border-t border-mist-100 pt-4">
+              <p className="mb-2 text-sm font-medium text-ink-900">ارسال آزمایشی</p>
+              <div className="flex max-w-md flex-col gap-2 sm:flex-row">
+                <input
+                  className="input"
+                  type="email"
+                  dir="ltr"
+                  value={testTo}
+                  onChange={(e) => setTestTo(e.target.value)}
+                  placeholder="you@email.com"
+                  autoComplete="email"
+                />
+                <button
+                  type="button"
+                  className="btn-dark cursor-pointer shrink-0"
+                  disabled={testBusy || !testTo.trim()}
+                  onClick={sendSmtpTest}
+                >
+                  {testBusy ? 'در حال ارسال...' : 'ارسال آزمایشی'}
+                </button>
+              </div>
+            </div>
+          </form>
+        )
+      ) : tab === 'sms' ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-700/55">
@@ -397,7 +627,7 @@ export default function AdminSettingsPage() {
             </button>
           </div>
           {smsLoading ? (
-            <div className="h-40 animate-pulse rounded-2xl bg-white" />
+            <div className="h-40 animate-pulse rounded-2xl bg-surface" />
           ) : (
             <AdminTable columns={['سرویس', 'وضعیت', 'فعال', '']}>
               {smsRows.map((row) => (
@@ -511,9 +741,9 @@ export default function AdminSettingsPage() {
           </AdminModal>
         </div>
       ) : loading ? (
-        <div className="h-48 animate-pulse rounded-2xl bg-white" />
+        <div className="h-48 animate-pulse rounded-2xl bg-surface" />
       ) : (
-        <form onSubmit={save} className="rounded-2xl border border-mist-200/80 bg-white p-5 shadow-soft sm:p-6">
+        <form onSubmit={save} className="rounded-2xl border border-mist-200/80 bg-surface p-5 shadow-soft sm:p-6">
           {tab === 'auth' && (
             <div className="space-y-4">
               <p className="text-sm text-ink-700/55">
@@ -559,22 +789,34 @@ export default function AdminSettingsPage() {
           {tab === 'company' && (
             <div className="space-y-4">
               <p className="text-sm text-ink-700/55">
-                اگر خالی بمانند، در فوتر و بخش‌های عمومی فروشگاه نمایش داده نمی‌شوند.
+                تلفن، ایمیل و آدرس اختیاری‌اند. هر کدام را پر کنید در فوتر و صفحه تماس نمایش داده می‌شود؛ خالی‌ها نشان داده نمی‌شوند.
               </p>
               <label className="block max-w-md">
                 <span className="label">شماره تلفن شرکت</span>
                 <input
                   className="input"
-                  value={form.company_phone}
+                  value={form.company_phone || ''}
                   onChange={(e) => setForm({ ...form, company_phone: e.target.value })}
                   placeholder="مثلاً ۰۲۱-۹۱۰۰۰۰۰۰"
+                />
+              </label>
+              <label className="block max-w-md">
+                <span className="label">ایمیل شرکت</span>
+                <input
+                  className="input"
+                  type="email"
+                  dir="ltr"
+                  value={form.company_email || ''}
+                  onChange={(e) => setForm({ ...form, company_email: e.target.value })}
+                  autoComplete="email"
+                  placeholder="info@example.com"
                 />
               </label>
               <label className="block max-w-xl">
                 <span className="label">آدرس شرکت</span>
                 <textarea
                   className="input min-h-[100px]"
-                  value={form.company_address}
+                  value={form.company_address || ''}
                   onChange={(e) => setForm({ ...form, company_address: e.target.value })}
                   placeholder="آدرس کامل دفتر / انبار"
                 />

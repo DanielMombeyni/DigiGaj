@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
 
         <form
           onSubmit={submit}
-          className="rounded-3xl border border-white/10 bg-white/95 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur"
+          className="rounded-3xl border border-mist-50/10 bg-surface/95 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.45)] backdrop-blur"
         >
           <label className="block">
             <span className="label">نام کاربری مدیریت</span>

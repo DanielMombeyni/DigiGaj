@@ -195,6 +195,9 @@ class CustomerTicketViewSet(viewsets.GenericViewSet):
             is_staff_reply=False,
             body=data["message"],
         )
+        from app.services.email_dispatch import queue_mail_event
+
+        queue_mail_event("ticket_created", "ticket", ticket.pk)
         ticket = self.get_queryset().prefetch_related("messages__author").get(pk=ticket.pk)
         return Response(
             CustomerTicketDetailSerializer(ticket).data,

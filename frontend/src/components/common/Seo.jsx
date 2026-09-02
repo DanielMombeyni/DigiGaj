@@ -73,20 +73,31 @@ export default function Seo({
   return null
 }
 
-export function organizationJsonLd() {
-  return {
+export function organizationJsonLd(contact = {}) {
+  const point = {
+    '@type': 'ContactPoint',
+    contactType: 'customer service',
+    availableLanguage: ['Persian', 'fa'],
+  }
+  if (contact.email) point.email = contact.email
+  if (contact.phone) point.telephone = contact.phone
+
+  const org = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: brand.name,
     url: typeof window !== 'undefined' ? window.location.origin : '',
     logo: typeof window !== 'undefined' ? `${window.location.origin}/vite.svg` : '/vite.svg',
-    contactPoint: {
-      '@type': 'ContactPoint',
-      contactType: 'customer service',
-      email: 'support@gadgetstore.local',
-      availableLanguage: ['Persian', 'fa'],
-    },
   }
+  if (contact.email || contact.phone) org.contactPoint = point
+  if (contact.address) {
+    org.address = {
+      '@type': 'PostalAddress',
+      streetAddress: contact.address,
+      addressCountry: 'IR',
+    }
+  }
+  return org
 }
 
 export function productJsonLd(product) {

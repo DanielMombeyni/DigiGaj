@@ -26,6 +26,7 @@ export default {
           500: 'rgb(var(--color-sea-500-rgb) / <alpha-value>)',
           600: 'rgb(var(--color-sea-600-rgb) / <alpha-value>)',
         },
+        surface: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
       },
       fontFamily: {
         display: ['"Vazirmatn"', '"IBM Plex Sans Arabic"', 'Tahoma', 'sans-serif'],

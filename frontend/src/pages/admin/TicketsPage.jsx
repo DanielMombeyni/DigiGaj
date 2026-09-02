@@ -158,7 +158,7 @@ export default function AdminTicketsPage() {
             className={`cursor-pointer rounded-xl px-3 py-1.5 text-xs font-medium transition ${
               filter === value
                 ? 'bg-ink-950 text-white'
-                : 'border border-mist-200 bg-white text-ink-700/60 hover:bg-mist-50'
+                : 'border border-mist-200 bg-surface text-ink-700/60 hover:bg-mist-50'
             }`}
           >
             {label}
@@ -169,7 +169,7 @@ export default function AdminTicketsPage() {
       {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       {loading ? (
-        <div className="h-40 animate-pulse rounded-2xl bg-white" />
+        <div className="h-40 animate-pulse rounded-2xl bg-surface" />
       ) : (
         <AdminTable columns={['شماره', 'موضوع', 'مشتری', 'وضعیت', 'اولویت', 'به‌روزرسانی', '']}>
           {items.map((t) => {
@@ -261,7 +261,7 @@ export default function AdminTicketsPage() {
                   key={m.id}
                   className={`rounded-xl px-3 py-2.5 text-sm leading-7 ${
                     m.is_staff_reply
-                      ? 'mr-6 bg-white border border-mist-200'
+                      ? 'mr-6 bg-surface border border-mist-200'
                       : 'ml-6 bg-copper-500/10 border border-copper-400/20'
                   }`}
                 >

@@ -129,4 +129,7 @@ class OrderService:
             DiscountCode.objects.filter(pk=discount_obj.pk).update(
                 used_count=discount_obj.used_count + 1
             )
+        from app.services.email_dispatch import queue_mail_event
+
+        queue_mail_event("order_created", "order", order.pk)
         return order, None

@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import { ShoppingCart, Menu, X, UserRound } from 'lucide-react'
 import { useCartStore } from '@/store/cart'
 import { useAuthStore } from '@/store/auth'
-import { getStorefrontConfig } from '@/services/storefrontConfig'
+import { getStorefrontConfig, subscribeStorefrontConfig } from '@/services/storefrontConfig'
 import { faDigits } from '@/utils/format'
 import { isPageEnabled } from '@/config/publicPages'
 import SiteBranding from '@/components/shop/SiteBranding'
@@ -32,9 +32,22 @@ export default function ShopLayout() {
   }, [fetchMe])
 
   useEffect(() => {
-    getStorefrontConfig()
-      .then((data) => setConfig(data))
-      .catch(() => setConfig(null))
+    let cancelled = false
+    const load = ({ force = false } = {}) => {
+      getStorefrontConfig({ force })
+        .then((data) => {
+          if (!cancelled) setConfig(data)
+        })
+        .catch(() => {
+          if (!cancelled) setConfig(null)
+        })
+    }
+    load()
+    const unsubscribe = subscribeStorefrontConfig(() => load({ force: true }))
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
@@ -232,7 +245,16 @@ export default function ShopLayout() {
           <div>
             <div className="text-sm font-semibold text-white/90">پشتیبانی</div>
             <div className="mt-4 space-y-2.5 text-sm text-white/55">
-              {config?.company_phone && <p>{config.company_phone}</p>}
+              {config?.company_phone && (
+                <a href={`tel:${config.company_phone}`} className="block transition hover:text-copper-400">
+                  {config.company_phone}
+                </a>
+              )}
+              {config?.company_email && (
+                <a href={`mailto:${config.company_email}`} className="block break-all transition hover:text-copper-400" dir="ltr">
+                  {config.company_email}
+                </a>
+              )}
               {config?.company_address && <p className="leading-7">{config.company_address}</p>}
               {showTerms && (
                 <Link to="/pages/terms" className="block transition hover:text-copper-400">قوانین و مقررات</Link>

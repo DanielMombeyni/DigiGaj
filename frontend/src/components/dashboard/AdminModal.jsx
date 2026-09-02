@@ -68,7 +68,7 @@ export default function AdminModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`relative z-[81] flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl border border-mist-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.28)] animate-rise sm:rounded-3xl ${widths[size] || widths.md}`}
+        className={`relative z-[81] flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl border border-mist-200 bg-surface shadow-[0_24px_64px_rgba(15,23,42,0.28)] animate-rise sm:rounded-3xl ${widths[size] || widths.md}`}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-mist-100 px-5 py-4 sm:px-6">
           <div className="min-w-0">

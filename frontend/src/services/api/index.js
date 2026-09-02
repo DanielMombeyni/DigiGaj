@@ -109,10 +109,23 @@ export const adminApi = {
       api.post('/payment/admin/card-confirm/', { tracking_number }),
     transactions: () => api.get('/payment/admin/transactions/'),
   },
-  storeConfig: {
-    get: () => api.get('/admin/store-config/'),
-    update: (data) => api.put('/admin/store-config/', data),
-  },
+    storeConfig: {
+      get: () => api.get('/admin/store-config/'),
+      update: (data) => api.put('/admin/store-config/', data),
+    },
+    emailSmtp: {
+      get: () => api.get('/admin/email-smtp/'),
+      update: (data) => api.put('/admin/email-smtp/', data),
+      test: (to) => api.post('/admin/email-smtp/test/', { to }),
+    },
+    emailTemplates: {
+      catalog: () => api.get('/admin/email-templates/catalog/'),
+      list: () => api.get('/admin/email-templates/'),
+      create: (data) => api.post('/admin/email-templates/', data),
+      update: (id, data) => api.patch(`/admin/email-templates/${id}/`, data),
+      remove: (id) => api.delete(`/admin/email-templates/${id}/`),
+      test: (id, to) => api.post(`/admin/email-templates/${id}/test/`, { to }),
+    },
   smsProviders: {
     catalog: () => api.get('/admin/sms-providers/catalog/'),
     list: () => api.get('/admin/sms-providers/'),

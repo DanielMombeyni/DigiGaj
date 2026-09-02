@@ -27,6 +27,7 @@ import AdminAccountingPage from '@/pages/admin/AccountingPage'
 import AdminGatewaysPage from '@/pages/admin/GatewaysPage'
 import AdminTransactionsPage from '@/pages/admin/TransactionsPage'
 import AdminSettingsPage from '@/pages/admin/SettingsPage'
+import AdminEmailsPage from '@/pages/admin/EmailsPage'
 import AdminTicketsPage from '@/pages/admin/TicketsPage'
 import AdminPersonnelPage from '@/pages/admin/PersonnelPage'
 import AdminCustomersPage from '@/pages/admin/CustomersPage'
@@ -89,6 +90,7 @@ export default function App() {
           <Route path="transactions" element={<AdminTransactionsPage />} />
           <Route path="tickets" element={<AdminTicketsPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
+          <Route path="emails" element={<AdminEmailsPage />} />
           <Route path="personnel" element={<AdminPersonnelPage />} />
           <Route path="customers" element={<AdminCustomersPage />} />
           <Route path="storefront" element={<AdminStorefrontPagesPage />} />

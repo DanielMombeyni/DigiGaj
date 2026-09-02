@@ -77,6 +77,7 @@ export default function HomePage() {
   const heroImage = settings.hero_glass_image || null
   const featured = data?.featured_products || []
   const categories = data?.categories || []
+  const company = data?.config || {}
 
   return (
     <div>
@@ -88,7 +89,11 @@ export default function HomePage() {
         }
         path="/"
         jsonLd={[
-          organizationJsonLd(),
+          organizationJsonLd({
+            email: company.company_email,
+            phone: company.company_phone,
+            address: company.company_address,
+          }),
           {
             '@context': 'https://schema.org',
             '@type': 'WebSite',

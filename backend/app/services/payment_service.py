@@ -223,6 +223,15 @@ class PaymentService:
         if order and order.status == Order.Status.PENDING:
             order.status = Order.Status.PAID
             order.save(update_fields=["status", "updated_at"])
+            from app.services.email_dispatch import queue_mail_event
+
+            queue_mail_event("order_paid", "order", order.pk)
+            queue_mail_event(
+                "order_status_changed",
+                "order",
+                order.pk,
+                {"previous_status": Order.Status.PENDING},
+            )
             # decrease stock
             for item in order.items.select_related("product"):
                 product = item.product

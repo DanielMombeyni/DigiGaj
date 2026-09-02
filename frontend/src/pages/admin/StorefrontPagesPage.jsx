@@ -113,7 +113,7 @@ function PageIcon({ pageKey, kind }) {
 
 function ColorField({ label, value, onChange }) {
   return (
-    <label className="block rounded-xl border border-mist-200 bg-white p-3">
+    <label className="block rounded-xl border border-mist-200 bg-surface p-3">
       <span className="mb-2 flex items-center justify-between gap-2 text-xs font-medium text-ink-700">
         {label}
         <span className="font-mono text-[10px] text-ink-700/45" dir="ltr">
@@ -419,8 +419,8 @@ export default function AdminStorefrontPagesPage() {
 
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-          <div className="h-96 animate-pulse rounded-2xl bg-white" />
-          <div className="h-96 animate-pulse rounded-2xl bg-white" />
+          <div className="h-96 animate-pulse rounded-2xl bg-surface" />
+          <div className="h-96 animate-pulse rounded-2xl bg-surface" />
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
@@ -465,7 +465,7 @@ export default function AdminStorefrontPagesPage() {
               <form onSubmit={saveGeneral} className="space-y-6">
                 <div className="rounded-2xl border border-mist-200 bg-gradient-to-br from-mist-50 to-white p-5">
                   <div className="flex flex-wrap items-start gap-5">
-                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-mist-200 bg-white shadow-soft">
+                    <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-mist-200 bg-surface shadow-soft">
                       {iconPreview ? (
                         <img src={mediaSrc(iconPreview)} alt="" className="h-full w-full object-contain p-2" />
                       ) : (
@@ -547,7 +547,7 @@ export default function AdminStorefrontPagesPage() {
                           className={`cursor-pointer rounded-2xl border p-4 text-right transition ${
                             active
                               ? 'border-copper-500 bg-copper-500/5 shadow-soft ring-2 ring-copper-500/30'
-                              : 'border-mist-200 bg-white hover:border-copper-400/40'
+                              : 'border-mist-200 bg-surface hover:border-copper-400/40'
                           }`}
                         >
                           <div className="mb-3 flex gap-1.5">

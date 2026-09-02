@@ -12,6 +12,7 @@ export const ADMIN_PAGES = [
   { key: 'personnel', label: 'پرسنل و نقش‌ها', path: '/personnel' },
   { key: 'customers', label: 'مشتریان', path: '/customers' },
   { key: 'storefront', label: 'صفحات فروشگاه', path: '/storefront' },
+  { key: 'emails', label: 'ایمیل‌ها', path: '/emails' },
 ]
 
 /** Map pathname under panel to page key */

@@ -22,7 +22,7 @@ export function AdminStatCard({ label, value, hint, accent = 'copper' }) {
     amber: 'from-amber-500/15 to-transparent text-amber-700',
   }
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-mist-200/80 bg-white p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(15,23,42,0.1)]">
+    <div className="group relative overflow-hidden rounded-2xl border border-mist-200/80 bg-surface p-5 shadow-soft transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(15,23,42,0.1)]">
       <div className={`pointer-events-none absolute inset-0 bg-gradient-to-bl ${accents[accent] || accents.copper}`} />
       <div className="relative">
         <div className="text-xs font-medium text-ink-700/50">{label}</div>
@@ -35,7 +35,7 @@ export function AdminStatCard({ label, value, hint, accent = 'copper' }) {
 
 export function AdminCard({ title, children, className = '' }) {
   return (
-    <section className={`rounded-2xl border border-mist-200/80 bg-white p-5 shadow-soft ${className}`}>
+    <section className={`rounded-2xl border border-mist-200/80 bg-surface p-5 shadow-soft ${className}`}>
       {title && <h2 className="mb-4 font-semibold text-ink-900">{title}</h2>}
       {children}
     </section>
@@ -51,7 +51,7 @@ export function AdminTable({
   const isEmpty = rows.length === 0
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-mist-200/80 bg-white shadow-soft">
+    <div className="overflow-x-auto rounded-2xl border border-mist-200/80 bg-surface shadow-soft">
       <table className="w-full min-w-[640px] text-sm">
         <thead className="bg-mist-50 text-right text-ink-700/60">
           <tr>

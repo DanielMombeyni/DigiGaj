@@ -217,7 +217,7 @@ export default function AdminPersonnelPage() {
               className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2 text-sm transition ${
                 active
                   ? 'bg-ink-950 text-white'
-                  : 'bg-white text-ink-700/70 ring-1 ring-mist-200 hover:bg-mist-50'
+                  : 'bg-surface text-ink-700/70 ring-1 ring-mist-200 hover:bg-mist-50'
               }`}
             >
               <Icon className="h-4 w-4" strokeWidth={1.75} />
