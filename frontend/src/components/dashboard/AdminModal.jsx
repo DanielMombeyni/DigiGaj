@@ -4,7 +4,7 @@ import { X } from 'lucide-react'
 
 /**
  * Shared admin dialog for create/edit forms.
- * Traps focus lightly, closes on Escape / backdrop click.
+ * Focuses the first field once when opened; closes on Escape / backdrop click.
  */
 export default function AdminModal({
   open,
@@ -17,18 +17,22 @@ export default function AdminModal({
 }) {
   const titleId = useId()
   const panelRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     if (!open) return undefined
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.()
+      if (e.key === 'Escape') onCloseRef.current?.()
     }
     window.addEventListener('keydown', onKey)
     const t = window.setTimeout(() => {
-      const el = panelRef.current?.querySelector(
-        'input, select, textarea, button:not([data-modal-close])',
+      const panel = panelRef.current
+      if (!panel || panel.contains(document.activeElement)) return
+      const el = panel.querySelector(
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([data-modal-close]):not([disabled])',
       )
       el?.focus?.()
     }, 30)
@@ -37,7 +41,7 @@ export default function AdminModal({
       window.removeEventListener('keydown', onKey)
       window.clearTimeout(t)
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
