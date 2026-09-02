@@ -6,6 +6,16 @@ import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { getStorefrontConfig } from '@/services/storefrontConfig'
 
+const DEFAULT_INTRO = 'از طریق فرم زیر تیکت پشتیبانی ثبت کنید تا تیم ما پاسخ دهد.'
+
+function contactIntro(body) {
+  const text = (body || '').trim()
+  if (!text) return DEFAULT_INTRO
+  if (/mombeyni\.daniel@gmail\.com/i.test(text)) return DEFAULT_INTRO
+  if (/از طریق ایمیل\s+\S+@\S+\s+با ما در ارتباط باشید/.test(text)) return DEFAULT_INTRO
+  return text
+}
+
 export default function ContactPage() {
   const [page, setPage] = useState(null)
   const [config, setConfig] = useState(null)
@@ -28,7 +38,7 @@ export default function ContactPage() {
       .catch(() =>
         setPage({
           title: 'تماس با ما',
-          body: 'از طریق فرم زیر تیکت پشتیبانی ثبت کنید تا تیم ما پاسخ دهد.',
+          body: DEFAULT_INTRO,
         }),
       )
     getStorefrontConfig()
@@ -85,7 +95,7 @@ export default function ContactPage() {
         <Reveal className="mx-auto max-w-3xl">
           <p className="text-xs font-semibold tracking-widest text-copper-400">CONTACT</p>
           <h1 className="mt-3 font-display text-4xl font-bold">{page?.title || 'تماس با ما'}</h1>
-          <p className="mt-3 max-w-xl text-sm leading-7 text-white/60">{page?.body}</p>
+          <p className="mt-3 max-w-xl text-sm leading-7 text-white/60">{contactIntro(page?.body)}</p>
         </Reveal>
       </section>
       <Reveal className={`mx-auto px-4 py-12 ${hasCompany ? 'grid max-w-5xl gap-8 lg:grid-cols-2' : 'max-w-xl'}`}>

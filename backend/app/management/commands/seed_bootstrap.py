@@ -176,14 +176,18 @@ class Command(BaseCommand):
                 "is_published": True,
             },
         )
-        SitePage.objects.update_or_create(
+        contact_body = "از طریق فرم زیر تیکت پشتیبانی ثبت کنید تا تیم ما پاسخ دهد."
+        page, created = SitePage.objects.get_or_create(
             slug="contact",
             defaults={
                 "title": "تماس با ما",
-                "body": f"از طریق ایمیل {BOOTSTRAP_EMAIL} با ما در ارتباط باشید.",
+                "body": contact_body,
                 "is_published": True,
             },
         )
+        if not created and "mombeyni.daniel@gmail.com" in (page.body or ""):
+            page.body = contact_body
+            page.save(update_fields=["body", "updated_at"])
         SitePage.objects.update_or_create(
             slug="terms",
             defaults={
