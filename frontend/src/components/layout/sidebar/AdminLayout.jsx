@@ -23,6 +23,7 @@ import { PANEL_BASE, PANEL_LOGIN } from '@/config/panel'
 import { pathToAdminPage, firstAllowedPath } from '@/config/adminPages'
 import BrandLogo from '@/components/common/BrandLogo'
 import { brand } from '@/config/brand'
+import LoadingScreen from '@/components/common/LoadingScreen'
 
 const iconCls = 'h-5 w-5'
 
@@ -165,9 +166,11 @@ export default function AdminLayout() {
 
   if (booting) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-mist-100 text-sm text-ink-700/50">
-        در حال بارگذاری پنل...
-      </div>
+      <LoadingScreen
+        variant="fullscreen"
+        tone="dark"
+        label="در حال بارگذاری پنل مدیریت..."
+      />
     )
   }
 

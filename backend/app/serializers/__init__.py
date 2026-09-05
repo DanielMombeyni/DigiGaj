@@ -258,7 +258,8 @@ class ProductDetailSerializer(ProductListSerializer):
             need = limit - len(picked)
             if need <= 0:
                 return
-            for product in qs:
+            # Slice in SQL — iterating an unsliced QS can load the full table
+            for product in qs[: need + len(seen)]:
                 if product.pk in seen:
                     continue
                 picked.append(product)
@@ -374,10 +375,20 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         return instance
 
     def to_representation(self, instance):
-        # Avoid stale prefetch after option/stock sync (in_stock / has_options)
-        if hasattr(instance, "_prefetched_objects_cache"):
-            instance._prefetched_objects_cache.clear()
-        return ProductDetailSerializer(instance, context=self.context).data
+        # Re-fetch with prefetch so detail response does not N+1 after sync
+        product = (
+            Product.objects.select_related("category")
+            .prefetch_related(
+                "images",
+                "colors",
+                "sizes",
+                "variants__color",
+                "variants__size",
+                "attributes",
+            )
+            .get(pk=instance.pk)
+        )
+        return ProductDetailSerializer(product, context=self.context).data
 
 
 class DiscountCodeSerializer(serializers.ModelSerializer):

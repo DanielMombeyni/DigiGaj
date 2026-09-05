@@ -54,7 +54,7 @@ DEFAULT_ENABLED = {item["key"]: True for item in PAGE_REGISTRY}
 DEFAULT_PUBLIC_PAGES = {
     "enabled": deepcopy(DEFAULT_ENABLED),
     "site_icon": "",
-    "theme": "classic",
+    "theme": "green",
     "colors": {},
 }
 
@@ -98,8 +98,8 @@ def _normalize(raw: dict | None) -> dict:
     data["enabled"] = _normalize_enabled(raw.get("enabled"))
     if raw.get("site_icon") is not None:
         data["site_icon"] = str(raw["site_icon"]).strip()
-    theme = str(raw.get("theme") or "classic").strip().lower()
-    data["theme"] = theme if theme in THEME_CHOICES else "classic"
+    theme = str(raw.get("theme") or "green").strip().lower()
+    data["theme"] = theme if theme in THEME_CHOICES else "green"
     colors_raw = raw.get("colors")
     if isinstance(colors_raw, dict):
         cleaned = {}
@@ -117,7 +117,7 @@ def _normalize(raw: dict | None) -> dict:
 
 def appearance_payload(settings: dict | None = None) -> dict:
     settings = settings or get_public_pages_settings()
-    theme = settings.get("theme") or "classic"
+    theme = settings.get("theme") or "green"
     colors = resolve_colors(theme, settings.get("colors"))
     return {
         "theme": theme,

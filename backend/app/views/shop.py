@@ -119,9 +119,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         qs = Product.objects.select_related("category")
         action = getattr(self, "action", None)
         if action in ("list", None):
-            # Lean prefetch for cards — avoid loading attributes / nested variant FKs
+            # Lean prefetch for cards — primary image + variants for price/stock only
             qs = qs.prefetch_related(
-                "images",
+                Prefetch(
+                    "images",
+                    queryset=ProductImage.objects.order_by("-is_primary", "sort_order"),
+                ),
                 Prefetch(
                     "variants",
                     queryset=ProductVariant.objects.only(
@@ -499,7 +502,12 @@ def storefront_home(request):
             "sizes",
         )[:8]
     )
-    categories = Category.objects.filter(is_active=True, parent__isnull=True)[:12]
+    categories = (
+        Category.objects.filter(is_active=True)
+        .select_related("parent")
+        .annotate(children_count=Count("children"))
+        .order_by("sort_order", "name")[:100]
+    )
     banners = Banner.objects.filter(is_active=True)[:5]
     settings_map = {s.key: s.value for s in SiteSetting.objects.all()}
     settings_map["store"] = public_store_settings()

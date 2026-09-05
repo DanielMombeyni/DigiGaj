@@ -161,7 +161,7 @@ class Command(BaseCommand):
         if not public_row:
             SiteSetting.objects.create(
                 key="public_pages",
-                value={"enabled": DEFAULT_ENABLED.copy(), "site_icon": "", "theme": "classic", "colors": {}},
+                value={"enabled": DEFAULT_ENABLED.copy(), "site_icon": "", "theme": "green", "colors": {}},
             )
 
     def _ensure_cms_pages(self):

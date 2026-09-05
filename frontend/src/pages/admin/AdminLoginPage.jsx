@@ -5,11 +5,13 @@ import { useAuthStore } from '@/store/auth'
 import Seo from '@/components/common/Seo'
 import { brand } from '@/config/brand'
 import { PANEL_BASE, PANEL_LOGIN } from '@/config/panel'
+import LoadingScreen from '@/components/common/LoadingScreen'
 
 export default function AdminLoginPage() {
   const login = useAuthStore((s) => s.login)
   const loading = useAuthStore((s) => s.loading)
   const user = useAuthStore((s) => s.user)
+  const booting = useAuthStore((s) => s.booting)
   const fetchMe = useAuthStore((s) => s.fetchMe)
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
@@ -43,7 +45,15 @@ export default function AdminLoginPage() {
     }
   }
 
-  if (user?.is_staff) return null
+  if (booting || user?.is_staff) {
+    return (
+      <LoadingScreen
+        variant="fullscreen"
+        tone="dark"
+        label={user?.is_staff ? 'در حال ورود به پنل...' : 'در حال بررسی نشست...'}
+      />
+    )
+  }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-950 px-4 py-12">

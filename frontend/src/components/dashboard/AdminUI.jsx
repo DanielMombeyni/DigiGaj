@@ -46,12 +46,19 @@ export function AdminTable({
   columns,
   children,
   emptyMessage = 'هیچ داده‌ای وجود ندارد',
+  embedded = false,
 }) {
   const rows = Children.toArray(children).filter(Boolean)
   const isEmpty = rows.length === 0
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-mist-200/80 bg-surface shadow-soft">
+    <div
+      className={
+        embedded
+          ? 'overflow-x-auto border-t border-mist-200/80'
+          : 'overflow-x-auto rounded-2xl border border-mist-200/80 bg-surface shadow-soft'
+      }
+    >
       <table className="w-full min-w-[640px] text-sm">
         <thead className="bg-mist-50 text-right text-ink-700/60">
           <tr>

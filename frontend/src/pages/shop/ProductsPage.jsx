@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ChevronDown, SlidersHorizontal } from 'lucide-react'
 import { shopApi } from '@/services/api'
@@ -11,6 +11,7 @@ import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { useDebounce } from '@/hooks/useDebounce'
 import { categorySelectOptions } from '@/utils/categories'
+import { faDigits } from '@/utils/format'
 
 const SORT_OPTIONS = [
   { value: '-created_at', label: 'جدیدترین' },
@@ -25,7 +26,7 @@ function roundUp(n, step = PRICE_STEP) {
   return Math.ceil(n / step) * step
 }
 
-function buildParams({ search, category, minPrice, maxPrice, minRating, ordering }) {
+function buildParams({ search, category, minPrice, maxPrice, minRating, ordering, page }) {
   const next = new URLSearchParams()
   if (search) next.set('search', search)
   if (category) next.set('category', category)
@@ -33,6 +34,7 @@ function buildParams({ search, category, minPrice, maxPrice, minRating, ordering
   if (maxPrice) next.set('max_price', maxPrice)
   if (minRating) next.set('min_rating', minRating)
   if (ordering && ordering !== '-created_at') next.set('ordering', ordering)
+  if (page && Number(page) > 1) next.set('page', String(page))
   return next
 }
 
@@ -59,14 +61,23 @@ export default function ProductsPage() {
   const [filtersOpen, setFiltersOpen] = useState(filtersDefaultOpen)
   const [loading, setLoading] = useState(true)
   const [boundsReady, setBoundsReady] = useState(false)
+  const [page, setPage] = useState(() => Math.max(1, Number(params.get('page') || 1) || 1))
 
   const debouncedQ = useDebounce(q, 300)
   const debouncedRange = useDebounce(priceRange, 400)
 
-  const apiMin =
-    boundsReady && debouncedRange[0] > priceBounds.floor ? String(debouncedRange[0]) : ''
-  const apiMax =
-    boundsReady && debouncedRange[1] < priceBounds.ceil ? String(debouncedRange[1]) : ''
+  const urlMin = params.get('min_price') || ''
+  const urlMax = params.get('max_price') || ''
+  const apiMin = boundsReady
+    ? debouncedRange[0] > priceBounds.floor
+      ? String(debouncedRange[0])
+      : ''
+    : urlMin
+  const apiMax = boundsReady
+    ? debouncedRange[1] < priceBounds.ceil
+      ? String(debouncedRange[1])
+      : ''
+    : urlMax
 
   const paramKey = params.toString()
 
@@ -99,7 +110,6 @@ export default function ProductsPage() {
   }, [])
 
   useEffect(() => {
-    if (!boundsReady) return
     const fromUrl = buildParams({
       search: params.get('search') || '',
       category: params.get('category') || '',
@@ -107,6 +117,7 @@ export default function ProductsPage() {
       maxPrice: params.get('max_price') || '',
       minRating: params.get('min_rating') || '',
       ordering: params.get('ordering') || '-created_at',
+      page: params.get('page') || '1',
     }).toString()
     const fromState = buildParams({
       search: debouncedQ,
@@ -115,21 +126,24 @@ export default function ProductsPage() {
       maxPrice: apiMax,
       minRating,
       ordering,
+      page,
     }).toString()
     if (fromUrl === fromState) return
     setQ(params.get('search') || '')
     setCategory(params.get('category') || '')
     setMinRating(params.get('min_rating') || '')
-    setPriceRange([
-      parsePriceParam(params.get('min_price'), priceBounds.floor),
-      parsePriceParam(params.get('max_price'), priceBounds.ceil),
-    ])
+    setPage(Math.max(1, Number(params.get('page') || 1) || 1))
+    if (boundsReady) {
+      setPriceRange([
+        parsePriceParam(params.get('min_price'), priceBounds.floor),
+        parsePriceParam(params.get('max_price'), priceBounds.ceil),
+      ])
+    }
     setOrdering(params.get('ordering') || '-created_at')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramKey, boundsReady])
 
   useEffect(() => {
-    if (!boundsReady) return
     const next = buildParams({
       search: debouncedQ,
       category,
@@ -137,14 +151,23 @@ export default function ProductsPage() {
       maxPrice: apiMax,
       minRating,
       ordering,
+      page,
     })
     if (next.toString() !== params.toString()) {
       setParams(next, { replace: true })
     }
-  }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, boundsReady, params, setParams])
+  }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, page, params, setParams])
+
+  // Reset to page 1 when filters change (keep page when only page itself changes)
+  const filterKey = `${debouncedQ}|${category}|${apiMin}|${apiMax}|${minRating}|${ordering}`
+  const prevFilterKey = useRef(filterKey)
+  useEffect(() => {
+    if (prevFilterKey.current === filterKey) return
+    prevFilterKey.current = filterKey
+    setPage(1)
+  }, [filterKey])
 
   useEffect(() => {
-    if (!boundsReady) return
     let cancelled = false
     setLoading(true)
     shopApi
@@ -155,6 +178,7 @@ export default function ProductsPage() {
         max_price: apiMax || undefined,
         min_rating: minRating || undefined,
         ordering: ordering || undefined,
+        page,
         page_size: 24,
       })
       .then((r) => {
@@ -166,10 +190,13 @@ export default function ProductsPage() {
     return () => {
       cancelled = true
     }
-  }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, boundsReady])
+  }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, page])
 
   const list = data.results || data
   const items = Array.isArray(list) ? list : []
+  const totalCount = typeof data.count === 'number' ? data.count : items.length
+  const pageSize = 24
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize) || 1)
 
   const priceFiltered =
     boundsReady &&
@@ -181,6 +208,7 @@ export default function ProductsPage() {
     setMinRating('')
     setPriceRange([priceBounds.floor, priceBounds.ceil])
     setOrdering('-created_at')
+    setPage(1)
   }
 
   const panelFiltersActive = useMemo(
@@ -216,6 +244,7 @@ export default function ProductsPage() {
     maxPrice: apiMax,
     minRating,
     ordering,
+    page,
   }).toString()
 
   return (
@@ -341,11 +370,36 @@ export default function ProductsPage() {
             ))}
           </div>
         ) : items.length ? (
-          <Reveal className="reveal-scope grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((p, i) => (
-              <ProductCard key={p.id} product={p} index={i} />
-            ))}
-          </Reveal>
+          <>
+            <Reveal className="reveal-scope grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((p, i) => (
+                <ProductCard key={p.id} product={p} index={i} />
+              ))}
+            </Reveal>
+            {totalPages > 1 && (
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary min-h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  قبلی
+                </button>
+                <span className="rounded-xl bg-mist-100 px-3 py-2 text-xs font-semibold tabular-nums text-ink-700/70">
+                  صفحه {faDigits(page)} از {faDigits(totalPages)}
+                </span>
+                <button
+                  type="button"
+                  className="btn-secondary min-h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  بعدی
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <p className="rounded-2xl border border-dashed border-mist-200 bg-white px-6 py-16 text-center text-sm text-ink-700/50">
             محصولی با این فیلتر پیدا نشد.

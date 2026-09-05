@@ -115,14 +115,14 @@ def normalize_hex(value: str) -> str:
 
 
 def normalize_theme(theme: str | None) -> str:
-    key = str(theme or "classic").strip().lower()
+    key = str(theme or "green").strip().lower()
     if key not in THEME_CHOICES:
         raise ValidationError({"theme": "تم نامعتبر است. گزینه‌ها: classic، green، dark"})
     return key
 
 
 def normalize_colors(raw: dict | None) -> dict:
-    base = deepcopy(THEME_PRESETS["classic"])
+    base = deepcopy(THEME_PRESETS["green"])
     if not isinstance(raw, dict):
         return base
     for key in COLOR_KEYS:
@@ -132,7 +132,7 @@ def normalize_colors(raw: dict | None) -> dict:
 
 
 def resolve_colors(theme: str, colors: dict | None) -> dict:
-    theme_key = theme if theme in THEME_CHOICES else "classic"
+    theme_key = theme if theme in THEME_CHOICES else "green"
     resolved = deepcopy(THEME_PRESETS[theme_key])
     if isinstance(colors, dict):
         for key in COLOR_KEYS:
@@ -146,8 +146,8 @@ def resolve_colors(theme: str, colors: dict | None) -> dict:
 
 def theme_catalog() -> list[dict]:
     labels = {
-        "classic": "کلاسیک (فعلی)",
-        "green": "سبز",
+        "classic": "کلاسیک",
+        "green": "سبز (پیش‌فرض)",
         "dark": "دارک",
     }
     return [

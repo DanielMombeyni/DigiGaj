@@ -10,6 +10,7 @@ import {
 import { useAuthStore } from '@/store/auth'
 import { PANEL_BASE } from '@/config/panel'
 import Seo from '@/components/common/Seo'
+import LoadingScreen from '@/components/common/LoadingScreen'
 
 const iconCls = 'h-5 w-5'
 
@@ -40,11 +41,7 @@ export default function AccountLayout() {
   }, [fetchMe])
 
   if (booting) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center text-sm text-ink-700/50">
-        در حال بارگذاری...
-      </div>
-    )
+    return <LoadingScreen variant="page" label="در حال ورود به حساب کاربری..." />
   }
 
   if (!user) {

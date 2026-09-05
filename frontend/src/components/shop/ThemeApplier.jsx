@@ -11,17 +11,18 @@ export default function ThemeApplier() {
     let cancelled = false
 
     const paint = (data) => {
-      applyThemeToDocument(data?.theme || 'classic', data?.colors || {})
+      applyThemeToDocument(data?.theme || 'green', data?.colors || {})
     }
 
     const load = async ({ force = false } = {}) => {
       try {
-        const cached = !force ? peekStorefrontConfig() : null
+        const cached = peekStorefrontConfig()
         if (cached && !cancelled) paint(cached)
-        const data = await getStorefrontConfig({ force: force || !cached })
+        // Never force on cold miss — share inflight with ShopLayout / PublicPageGuard
+        const data = await getStorefrontConfig({ force })
         if (!cancelled) paint(data)
       } catch {
-        if (!cancelled) applyThemeToDocument('classic', THEME_PRESETS.classic)
+        if (!cancelled) applyThemeToDocument('green', THEME_PRESETS.green)
       }
     }
 

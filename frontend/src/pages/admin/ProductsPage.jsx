@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Plus, X, ImagePlus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Plus, X, ImagePlus, ImageOff, FolderOpen, FolderX, ChevronDown } from 'lucide-react'
 import { adminApi } from '@/services/api'
-import { toman } from '@/utils/format'
+import { faDigits, toman } from '@/utils/format'
 import { mediaSrc } from '@/utils/media'
 import { AdminPageHeader, AdminTable, AdminEditButton, AdminDeleteButton } from '@/components/dashboard/AdminUI'
 import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/dashboard/AdminModal'
+import ProductImageLightbox from '@/components/dashboard/ProductImageLightbox'
 import { useConfirm } from '@/components/common/ConfirmProvider'
 import { categorySelectOptions } from '@/utils/categories'
 
@@ -103,8 +104,185 @@ function buildVariantRows(colors, sizes, prev = []) {
   return rows
 }
 
+const UNCATEGORIZED_KEY = '__uncategorized__'
+
+function buildProductGroups(products, categories) {
+  const byCat = new Map()
+  for (const p of products) {
+    const key = p.category == null || p.category === '' ? UNCATEGORIZED_KEY : String(p.category)
+    if (!byCat.has(key)) byCat.set(key, [])
+    byCat.get(key).push(p)
+  }
+
+  const ordered = []
+  const catOpts = categorySelectOptions(categories)
+  const used = new Set()
+
+  for (const opt of catOpts) {
+    const key = String(opt.id)
+    const items = byCat.get(key)
+    if (!items?.length) continue
+    used.add(key)
+    ordered.push({
+      key,
+      title: opt.label.replace(/^—+\s*/, ''),
+      depth: opt.depth || 0,
+      fullLabel: opt.label,
+      items,
+    })
+  }
+
+  for (const [key, items] of byCat.entries()) {
+    if (key === UNCATEGORIZED_KEY || used.has(key) || !items.length) continue
+    const name = items[0]?.category_name || `دسته #${key}`
+    ordered.push({ key, title: name, depth: 0, fullLabel: name, items })
+  }
+
+  const uncategorized = byCat.get(UNCATEGORIZED_KEY) || []
+  if (uncategorized.length) {
+    ordered.push({
+      key: UNCATEGORIZED_KEY,
+      title: 'بدون دسته‌بندی',
+      depth: 0,
+      fullLabel: 'بدون دسته‌بندی',
+      items: uncategorized,
+      uncategorized: true,
+    })
+  }
+
+  return ordered
+}
+
+function ProductRow({ p, busy, onOpenGallery, onToggleInStock, onToggleActive, onEdit, onDelete }) {
+  const disc = discountPercentFromCompare(p.min_price ?? p.price_toman, p.compare_at_price_toman)
+  const thumb = p.primary_image || p.images?.[0]?.image
+  const galleryImages =
+    Array.isArray(p.images) && p.images.length
+      ? [...p.images].sort((a, b) => {
+          if (a.is_primary && !b.is_primary) return -1
+          if (!a.is_primary && b.is_primary) return 1
+          return (a.sort_order || 0) - (b.sort_order || 0)
+        })
+      : thumb
+        ? [{ image: thumb, is_primary: true }]
+        : []
+
+  return (
+    <tr className="border-t border-mist-100 transition hover:bg-mist-50/80">
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          {thumb ? (
+            <button
+              type="button"
+              className="group relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-mist-200 bg-mist-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
+              onClick={() =>
+                onOpenGallery({
+                  title: p.name,
+                  images: galleryImages,
+                  startIndex: 0,
+                })
+              }
+              aria-label={`مشاهده تصاویر ${p.name}`}
+              title="مشاهده تصاویر"
+            >
+              <img
+                src={mediaSrc(thumb)}
+                alt=""
+                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+              {galleryImages.length > 1 && (
+                <span className="absolute inset-x-0 bottom-0 bg-ink-950/70 py-0.5 text-center text-[9px] font-bold text-white">
+                  {galleryImages.length}
+                </span>
+              )}
+            </button>
+          ) : (
+            <div
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-dashed border-mist-200 bg-mist-50 text-ink-700/30"
+              aria-hidden
+            >
+              <ImageOff className="h-4 w-4" strokeWidth={1.75} />
+            </div>
+          )}
+          <span className="min-w-0 font-medium text-ink-900">{p.name}</span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        {p.price_on_request || Number(p.price_toman) === 0 ? (
+          <span className="text-xs font-medium leading-5 text-amber-700">
+            به دلیل نوسان قیمت با ما تماس بگیرید
+          </span>
+        ) : p.has_options && p.min_price != null && p.min_price !== p.price_toman ? (
+          `از ${toman(p.min_price)}`
+        ) : (
+          toman(p.price_toman)
+        )}
+      </td>
+      <td className="px-4 py-3">
+        {disc ? (
+          <span className="rounded-lg bg-copper-50 px-2 py-1 text-xs font-semibold text-copper-600">
+            ٪{disc}
+          </span>
+        ) : (
+          <span className="text-ink-700/35">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onToggleInStock(p)}
+          title={p.in_stock ? 'کلیک برای ناموجود کردن' : 'کلیک برای موجود کردن'}
+          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60 ${
+            p.in_stock
+              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+          }`}
+        >
+          {p.in_stock ? 'موجود' : 'ناموجود'}
+        </button>
+      </td>
+      <td className="px-4 py-3">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onToggleActive(p)}
+          title={p.is_active ? 'کلیک برای غیرفعال کردن' : 'کلیک برای فعال کردن'}
+          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60 ${
+            p.is_active
+              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              : 'bg-mist-100 text-ink-700/50 hover:bg-mist-200'
+          }`}
+        >
+          {p.is_active ? 'فعال' : 'غیرفعال'}
+        </button>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-1">
+          <AdminEditButton onClick={() => onEdit(p)} />
+          <AdminDeleteButton onClick={() => onDelete(p)} />
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function firstFormError(data) {
+  if (!data) return 'خطا در ذخیره'
+  if (typeof data === 'string') return data
+  if (Array.isArray(data)) return data.filter(Boolean).join(' — ') || 'خطا در ذخیره'
+  if (typeof data !== 'object') return String(data)
+  if (data.detail) return firstFormError(data.detail)
+  const [key, val] = Object.entries(data)[0] || []
+  if (!key) return 'خطا در ذخیره'
+  const msg = firstFormError(val)
+  return key === 'non_field_errors' ? msg : `${key}: ${msg}`
+}
+
 export default function AdminProductsPage() {
   const confirm = useConfirm()
+  const formReqId = useRef(0)
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [form, setForm] = useState(emptyForm)
@@ -118,17 +296,25 @@ export default function AdminProductsPage() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [rowBusy, setRowBusy] = useState('')
+  const [gallery, setGallery] = useState(null)
   const [error, setError] = useState('')
   const [tableError, setTableError] = useState('')
+  const [expanded, setExpanded] = useState({})
 
   const load = () => {
-    adminApi.products.list().then((r) => setProducts(r.data.results || r.data))
-    adminApi.categories.list().then((r) => setCategories(r.data.results || r.data))
+    adminApi.products.list({ page_size: 100 }).then((r) => setProducts(r.data.results || r.data))
+    adminApi.categories.list({ page_size: 100 }).then((r) => setCategories(r.data.results || r.data))
   }
 
   useEffect(() => {
     load()
   }, [])
+
+  const groups = useMemo(() => buildProductGroups(products, categories), [products, categories])
+
+  const toggleGroup = (key) => {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
 
   const patchLocal = (slug, patch) => {
     setProducts((prev) =>
@@ -214,6 +400,8 @@ export default function AdminProductsPage() {
   }
 
   const openCreate = () => {
+    formReqId.current += 1
+    setLoading(false)
     setEditing(null)
     setForm(emptyForm())
     resetExtras()
@@ -222,14 +410,15 @@ export default function AdminProductsPage() {
   }
 
   const openEdit = async (p) => {
+    const reqId = ++formReqId.current
     setError('')
     setLoading(true)
     try {
       const { data } = await adminApi.products.get(p.slug)
+      if (reqId !== formReqId.current) return
       setEditing(data)
       const onRequest =
         Boolean(data.price_on_request) || Number(data.price_toman) === 0
-      setEditing(data)
       setForm({
         name: data.name || '',
         slug: data.slug || '',
@@ -291,17 +480,34 @@ export default function AdminProductsPage() {
       setNewFiles([])
       setOpen(true)
     } catch (err) {
+      if (reqId !== formReqId.current) return
       setError(err.response?.data?.detail || 'خطا در بارگذاری محصول')
     } finally {
-      setLoading(false)
+      if (reqId === formReqId.current) setLoading(false)
     }
   }
 
   const close = () => {
     if (loading) return
+    formReqId.current += 1
     setOpen(false)
+    setError('')
   }
 
+  const submitProductForm = () => {
+    const el = document.getElementById('product-form')
+    if (!el) return
+    if (typeof el.checkValidity === 'function' && !el.checkValidity()) {
+      el.reportValidity?.()
+      el.querySelector?.(':invalid')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    if (typeof el.requestSubmit === 'function') {
+      el.requestSubmit()
+      return
+    }
+    el.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }))
+  }
   const setColorsAndRebuild = (next) => {
     setColors(next)
     setVariants((prev) => buildVariantRows(next, sizes, prev))
@@ -327,7 +533,7 @@ export default function AdminProductsPage() {
     }
     const payload = {
       ...formFields,
-      category: Number(form.category),
+      category: form.category ? Number(form.category) : null,
       price_on_request: Boolean(form.price_on_request),
       price_toman: form.price_on_request ? 0 : Number(form.price_toman),
       compare_at_price_toman: compareAt,
@@ -383,11 +589,7 @@ export default function AdminProductsPage() {
       setOpen(false)
       load()
     } catch (err) {
-      setError(
-        typeof err.response?.data === 'object'
-          ? JSON.stringify(err.response.data)
-          : err.message || 'خطا در ذخیره',
-      )
+      setError(firstFormError(err.response?.data) || err.message || 'خطا در ذخیره')
     } finally {
       setLoading(false)
     }
@@ -397,7 +599,7 @@ export default function AdminProductsPage() {
     <div className="animate-rise space-y-6">
       <AdminPageHeader
         title="محصولات"
-        description="تصاویر، رنگ، سایز، قیمت تنوع و ویژگی‌ها"
+        description="محصولات به‌تفکیک دسته‌بندی — تصاویر، رنگ، سایز و ویژگی‌ها"
         actions={
           <button type="button" className="btn-primary cursor-pointer" onClick={openCreate}>
             افزودن محصول
@@ -409,87 +611,106 @@ export default function AdminProductsPage() {
         <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{tableError}</p>
       )}
 
-      <AdminTable columns={['نام', 'قیمت', 'تخفیف', 'موجودی', 'وضعیت', '']}>
-        {products.map((p) => {
-          const disc = discountPercentFromCompare(
-            p.min_price ?? p.price_toman,
-            p.compare_at_price_toman,
-          )
-          const busy = rowBusy === p.slug
-          return (
-          <tr key={p.id} className="border-t border-mist-100 transition hover:bg-mist-50/80">
-            <td className="px-4 py-3 font-medium">{p.name}</td>
-            <td className="px-4 py-3">
-              {p.price_on_request || Number(p.price_toman) === 0 ? (
-                <span className="text-xs font-medium leading-5 text-amber-700">
-                  به دلیل نوسان قیمت با ما تماس بگیرید
-                </span>
-              ) : p.has_options && p.min_price != null && p.min_price !== p.price_toman ? (
-                `از ${toman(p.min_price)}`
-              ) : (
-                toman(p.price_toman)
-              )}
-            </td>
-            <td className="px-4 py-3">
-              {disc ? (
-                <span className="rounded-lg bg-copper-50 px-2 py-1 text-xs font-semibold text-copper-600">
-                  ٪{disc}
-                </span>
-              ) : (
-                <span className="text-ink-700/35">—</span>
-              )}
-            </td>
-            <td className="px-4 py-3">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => toggleInStock(p)}
-                title={p.in_stock ? 'کلیک برای ناموجود کردن' : 'کلیک برای موجود کردن'}
-                className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60 ${
-                  p.in_stock
-                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+      {!products.length ? (
+        <div className="rounded-2xl border border-dashed border-mist-200 bg-surface px-6 py-14 text-center text-sm text-ink-700/50">
+          هنوز محصولی ثبت نشده است.
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {groups.map((group) => {
+            const isOpen = Boolean(expanded[group.key])
+            return (
+              <section
+                key={group.key}
+                className={`overflow-hidden rounded-2xl border shadow-soft ${
+                  group.uncategorized
+                    ? 'border-amber-200/80 bg-amber-50/30'
+                    : 'border-mist-200/80 bg-surface'
                 }`}
               >
-                {p.in_stock ? 'موجود' : 'ناموجود'}
-              </button>
-            </td>
-            <td className="px-4 py-3">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => toggleActive(p)}
-                title={p.is_active ? 'کلیک برای غیرفعال کردن' : 'کلیک برای فعال کردن'}
-                className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60 ${
-                  p.is_active
-                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                    : 'bg-mist-100 text-ink-700/50 hover:bg-mist-200'
-                }`}
-              >
-                {p.is_active ? 'فعال' : 'غیرفعال'}
-              </button>
-            </td>
-            <td className="px-4 py-3">
-              <div className="flex items-center justify-end gap-1">
-                <AdminEditButton onClick={() => openEdit(p)} />
-                <AdminDeleteButton
-                  onClick={async () => {
-                    const ok = await confirm({
-                      title: 'حذف محصول',
-                      description: `آیا از حذف «${p.name}» مطمئن هستید؟ در سفارش‌های قبلی نام محصول حفظ می‌شود.`,
-                      confirmLabel: 'حذف محصول',
-                    })
-                    if (!ok) return
-                    await adminApi.products.remove(p.slug)
-                    load()
-                  }}
-                />
-              </div>
-            </td>
-          </tr>
-          )
-        })}
-      </AdminTable>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-start transition hover:bg-mist-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-400"
+                  aria-expanded={isOpen}
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                        group.uncategorized
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-ink-950 text-copper-400'
+                      }`}
+                    >
+                      {group.uncategorized ? (
+                        <FolderX className="h-4 w-4" strokeWidth={1.75} />
+                      ) : (
+                        <FolderOpen className="h-4 w-4" strokeWidth={1.75} />
+                      )}
+                    </span>
+                    <div className="min-w-0">
+                      <h2
+                        className={`font-display text-sm font-bold sm:text-base ${
+                          group.uncategorized ? 'text-amber-900' : 'text-ink-900'
+                        }`}
+                        style={group.depth ? { paddingInlineStart: `${group.depth * 0.75}rem` } : undefined}
+                      >
+                        {group.fullLabel}
+                      </h2>
+                      {group.uncategorized && (
+                        <p className="mt-0.5 text-[11px] text-amber-800/70">
+                          این محصولات در فروشگاه بدون دسته دیده می‌شوند — از ویرایش، دسته انتخاب کنید.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`rounded-lg px-2 py-1 text-xs font-semibold tabular-nums ${
+                        group.uncategorized
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-mist-100 text-ink-700/70'
+                      }`}
+                    >
+                      {faDigits(group.items.length)} محصول
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-ink-700/40 transition ${isOpen ? 'rotate-180' : ''}`}
+                      strokeWidth={2}
+                    />
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <AdminTable embedded columns={['نام', 'قیمت', 'تخفیف', 'موجودی', 'وضعیت', '']}>
+                    {group.items.map((p) => (
+                      <ProductRow
+                        key={p.id}
+                        p={p}
+                        busy={rowBusy === p.slug}
+                        onOpenGallery={setGallery}
+                        onToggleInStock={toggleInStock}
+                        onToggleActive={toggleActive}
+                        onEdit={openEdit}
+                        onDelete={async (product) => {
+                          const ok = await confirm({
+                            title: 'حذف محصول',
+                            description: `آیا از حذف «${product.name}» مطمئن هستید؟ در سفارش‌های قبلی نام محصول حفظ می‌شود.`,
+                            confirmLabel: 'حذف محصول',
+                          })
+                          if (!ok) return
+                          await adminApi.products.remove(product.slug)
+                          load()
+                        }}
+                      />
+                    ))}
+                  </AdminTable>
+                )}
+              </section>
+            )
+          })}
+        </div>
+      )}
 
       <AdminModal
         open={open}
@@ -499,14 +720,24 @@ export default function AdminProductsPage() {
         size="xl"
         footer={
           <>
-            <ModalCancelButton onClick={close} />
-            <ModalSubmitButton form="product-form" loading={loading}>
+            {error ? (
+              <p className="me-auto max-w-md text-start text-xs text-red-600 sm:text-sm">{error}</p>
+            ) : null}
+            <ModalCancelButton onClick={close} disabled={loading} />
+            <ModalSubmitButton
+              type="button"
+              loading={loading}
+              onClick={submitProductForm}
+            >
               {editing ? 'ذخیره تغییرات' : 'افزودن'}
             </ModalSubmitButton>
           </>
         }
       >
         <form id="product-form" onSubmit={submit} className="space-y-6">
+          {error && (
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+          )}
           <section className="grid gap-3 sm:grid-cols-2">
             <label className="block sm:col-span-2">
               <span className="label">نام محصول</span>
@@ -518,8 +749,12 @@ export default function AdminProductsPage() {
             </label>
             <label className="block">
               <span className="label">دسته‌بندی</span>
-              <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
-                <option value="">انتخاب کنید</option>
+              <select
+                className="input"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              >
+                <option value="">بدون دسته‌بندی</option>
                 {categorySelectOptions(categories).map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
@@ -853,10 +1088,16 @@ export default function AdminProductsPage() {
               ))}
             </div>
           </section>
-
-          {error && <p className="text-sm text-red-500">{error}</p>}
         </form>
       </AdminModal>
+
+      <ProductImageLightbox
+        open={Boolean(gallery)}
+        onClose={() => setGallery(null)}
+        title={gallery?.title || ''}
+        images={gallery?.images || []}
+        startIndex={gallery?.startIndex || 0}
+      />
     </div>
   )
 }

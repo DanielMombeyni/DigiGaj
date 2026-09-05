@@ -11,6 +11,7 @@ import BrandLogo from '@/components/common/BrandLogo'
 import { brand } from '@/config/brand'
 import { isPriceOnRequest } from '@/utils/pricing'
 import PriceOnRequestNotice from '@/components/shop/PriceOnRequestNotice'
+import LoadingScreen from '@/components/common/LoadingScreen'
 
 export default function ProductDetailPage() {
   const { slug } = useParams()
@@ -87,16 +88,7 @@ export default function ProductDetailPage() {
   }
 
   if (!product) {
-    return (
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-2">
-        <div className="aspect-square animate-pulse rounded-3xl bg-mist-100" />
-        <div className="space-y-4">
-          <div className="h-4 w-24 animate-pulse rounded bg-mist-100" />
-          <div className="h-10 w-3/4 animate-pulse rounded bg-mist-100" />
-          <div className="h-24 animate-pulse rounded bg-mist-100" />
-        </div>
-      </div>
-    )
+    return <LoadingScreen variant="page" label="در حال بارگذاری محصول..." />
   }
 
   const image = activeImage || product.primary_image || product.images?.[0]?.image

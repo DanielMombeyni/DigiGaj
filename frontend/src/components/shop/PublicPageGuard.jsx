@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { getStorefrontConfig, peekStorefrontConfig } from '@/services/storefrontConfig'
 import { isPageEnabled } from '@/config/publicPages'
+import LoadingScreen from '@/components/common/LoadingScreen'
 
 export default function PublicPageGuard({ pageKey, children }) {
   const cached = peekStorefrontConfig()
@@ -30,11 +31,7 @@ export default function PublicPageGuard({ pageKey, children }) {
   }, [pageKey])
 
   if (state.loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-10 w-10 animate-pulse rounded-full bg-mist-200" />
-      </div>
-    )
+    return <LoadingScreen variant="page" label="در حال آماده‌سازی صفحه..." />
   }
 
   if (!state.allowed) {

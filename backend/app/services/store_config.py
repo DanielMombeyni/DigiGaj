@@ -135,7 +135,7 @@ def public_storefront_config() -> dict:
         "enamad_html": cfg["enamad_html"],
         "pages": pages_cfg["enabled"],
         "site_icon": pages_cfg["site_icon"],
-        "theme": pages_cfg.get("theme") or "classic",
+        "theme": pages_cfg.get("theme") or "green",
         "colors": pages_cfg.get("colors") or {},
     }
     if cfg["company_phone"]:

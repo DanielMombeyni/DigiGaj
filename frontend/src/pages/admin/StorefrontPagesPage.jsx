@@ -156,7 +156,7 @@ export default function AdminStorefrontPagesPage() {
   const [heroImageFile, setHeroImageFile] = useState(null)
   const [heroImagePreview, setHeroImagePreview] = useState('')
   const [heroClearImage, setHeroClearImage] = useState(false)
-  const [theme, setTheme] = useState('classic')
+  const [theme, setTheme] = useState('green')
   const [themes, setThemes] = useState([])
   const [colors, setColors] = useState({})
   const [colorFields, setColorFields] = useState([])
@@ -185,11 +185,11 @@ export default function AdminStorefrontPagesPage() {
   }, [cmsPages])
 
   const applyLoadedAppearance = (data) => {
-    setTheme(data.theme || 'classic')
+    setTheme(data.theme || 'green')
     setThemes(data.themes || [])
     setColors(data.colors || {})
     setColorFields(data.color_fields || [])
-    applyThemeToDocument(data.theme || 'classic', data.colors || {})
+    applyThemeToDocument(data.theme || 'green', data.colors || {})
   }
 
   const load = () =>
@@ -379,7 +379,7 @@ export default function AdminStorefrontPagesPage() {
   const previewPath = activePage?.path || '/'
   const themeLabel =
     themes.find((t) => t.id === theme)?.label ||
-    ({ classic: 'کلاسیک', green: 'سبز', dark: 'دارک' }[theme] || theme)
+    ({ classic: 'کلاسیک', green: 'سبز (پیش‌فرض)', dark: 'دارک' }[theme] || theme)
 
   return (
     <div className="animate-rise space-y-6">
@@ -527,8 +527,8 @@ export default function AdminStorefrontPagesPage() {
                     {(themes.length
                       ? themes
                       : [
-                          { id: 'classic', label: 'کلاسیک (فعلی)', colors },
-                          { id: 'green', label: 'سبز', colors },
+                          { id: 'classic', label: 'کلاسیک', colors },
+                          { id: 'green', label: 'سبز (پیش‌فرض)', colors },
                           { id: 'dark', label: 'دارک', colors },
                         ]
                     ).map((t) => {

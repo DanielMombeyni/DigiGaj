@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Truck, CreditCard, ShieldCheck, CircleHelp, ChevronDown } from 'lucide-react'
+import {
+  Truck,
+  CreditCard,
+  ShieldCheck,
+  CircleHelp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { ProductCard } from '@/components/shop/ProductCard'
 import Seo, { organizationJsonLd } from '@/components/common/Seo'
@@ -45,6 +53,142 @@ function SkeletonGrid() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-72 animate-pulse rounded-2xl bg-mist-100" />
       ))}
+    </div>
+  )
+}
+
+function CategoryRail({ categories, loading }) {
+  const scrollerRef = useRef(null)
+  const [canPrev, setCanPrev] = useState(false)
+  const [canNext, setCanNext] = useState(false)
+
+  const updateEdges = () => {
+    const el = scrollerRef.current
+    if (!el) return
+    const max = el.scrollWidth - el.clientWidth
+    // With dir=ltr: scrollLeft 0 = start (left), max = end (right)
+    setCanPrev(el.scrollLeft > 4)
+    setCanNext(el.scrollLeft < max - 4)
+  }
+
+  useEffect(() => {
+    const el = scrollerRef.current
+    if (!el) return undefined
+    updateEdges()
+    const onWheel = (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+      if (el.scrollWidth <= el.clientWidth) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    el.addEventListener('scroll', updateEdges, { passive: true })
+    el.addEventListener('wheel', onWheel, { passive: false })
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateEdges) : null
+    ro?.observe(el)
+    window.addEventListener('resize', updateEdges)
+    return () => {
+      el.removeEventListener('scroll', updateEdges)
+      el.removeEventListener('wheel', onWheel)
+      ro?.disconnect()
+      window.removeEventListener('resize', updateEdges)
+    }
+  }, [categories, loading])
+
+  const scrollByDir = (dir) => {
+    const el = scrollerRef.current
+    if (!el) return
+    const amount = Math.min(280, el.clientWidth * 0.7) * dir
+    el.scrollBy({ left: amount, behavior: 'smooth' })
+  }
+
+  if (loading) {
+    return (
+      <div className="mt-8 flex gap-4 overflow-hidden px-1">
+        {Array.from({ length: 10 }).map((_, i) => (
+          <div key={i} className="flex w-[4.75rem] shrink-0 flex-col items-center gap-2.5">
+            <div className="h-[4.75rem] w-[4.75rem] animate-pulse rounded-full bg-white/10" />
+            <div className="h-2.5 w-12 animate-pulse rounded-full bg-white/10" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (!categories.length) {
+    return <p className="mt-8 text-sm text-white/45">هنوز دسته‌بندی‌ای ثبت نشده است.</p>
+  }
+
+  return (
+    <div className="relative mt-8">
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-10 bg-gradient-to-r from-ink-950 to-transparent md:w-14"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-10 bg-gradient-to-l from-ink-950 to-transparent md:w-14"
+        aria-hidden
+      />
+
+      <button
+        type="button"
+        onClick={() => scrollByDir(-1)}
+        disabled={!canPrev}
+        aria-label="دسته‌های قبلی"
+        className="absolute left-0 top-[1.85rem] z-[2] hidden h-9 w-9 -translate-x-1 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-ink-900/90 text-white shadow-lg backdrop-blur-sm transition hover:border-copper-400/50 hover:bg-ink-800 disabled:pointer-events-none disabled:opacity-0 md:inline-flex"
+      >
+        <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollByDir(1)}
+        disabled={!canNext}
+        aria-label="دسته‌های بعدی"
+        className="absolute right-0 top-[1.85rem] z-[2] hidden h-9 w-9 translate-x-1 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-ink-900/90 text-white shadow-lg backdrop-blur-sm transition hover:border-copper-400/50 hover:bg-ink-800 disabled:pointer-events-none disabled:opacity-0 md:inline-flex"
+      >
+        <ChevronRight className="h-4 w-4" strokeWidth={2} />
+      </button>
+
+      <div
+        ref={scrollerRef}
+        dir="ltr"
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth px-2 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] md:gap-5 md:px-8 [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {categories.map((c) => (
+          <Link
+            key={c.id}
+            to={`/products?category=${c.id}`}
+            className="group flex w-[4.75rem] shrink-0 snap-start flex-col items-center gap-2.5 text-center focus-visible:outline-none md:w-[5.25rem]"
+          >
+            <span className="relative flex h-[4.75rem] w-[4.75rem] items-center justify-center md:h-[5.25rem] md:w-[5.25rem]">
+              <span
+                className="absolute inset-0 rounded-full bg-gradient-to-br from-copper-400/35 via-white/5 to-sea-600/30 opacity-70 transition duration-300 group-hover:opacity-100 group-hover:shadow-[0_0_24px_rgba(232,168,124,0.25)]"
+                aria-hidden
+              />
+              <span className="relative h-[calc(100%-6px)] w-[calc(100%-6px)] overflow-hidden rounded-full border border-white/15 bg-ink-900/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-300 group-hover:border-copper-400/45 group-focus-visible:ring-2 group-focus-visible:ring-copper-400 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-ink-950">
+                {c.image ? (
+                  <img
+                    src={mediaSrc(c.image)}
+                    alt=""
+                    className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                    loading="lazy"
+                    draggable={false}
+                  />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/[0.03]">
+                    <span className="font-display text-xl font-bold text-white/35 md:text-2xl">
+                      {c.name?.slice(0, 1)}
+                    </span>
+                  </span>
+                )}
+              </span>
+            </span>
+            <span className="line-clamp-2 min-h-[2.25rem] px-0.5 text-[11px] font-semibold leading-tight text-white/75 transition group-hover:text-white md:text-xs">
+              {c.name}
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }
@@ -144,7 +288,8 @@ export default function HomePage() {
                     src={mediaSrc(heroImage)}
                     alt=""
                     className="absolute inset-0 h-full w-full object-cover"
-                    loading="lazy"
+                    loading="eager"
+                    fetchPriority="high"
                   />
                 </div>
               ) : (
@@ -212,47 +357,34 @@ export default function HomePage() {
       </section>
 
       {/* Categories */}
-      <section className="border-y border-mist-200 bg-ink-950 py-16 text-white md:py-20">
-        <div className="mx-auto max-w-6xl px-4">
-          <Reveal>
-            <p className="text-xs font-semibold tracking-widest text-copper-400">CATEGORIES</p>
-            <h2 className="mt-2 font-display text-3xl font-bold md:text-4xl">دسته‌بندی‌ها</h2>
-            <p className="mt-2 max-w-lg text-sm text-white/55">مسیر سریع به همان چیزی که دنبالش هستید</p>
+      <section className="relative overflow-hidden border-y border-mist-200 bg-ink-950 py-12 text-white md:py-16">
+        <div
+          className="pointer-events-none absolute -left-24 top-0 h-56 w-56 rounded-full bg-copper-400/15 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-16 bottom-0 h-48 w-48 rounded-full bg-sea-600/20 blur-3xl"
+          aria-hidden
+        />
+        <div className="relative mx-auto max-w-6xl px-4">
+          <Reveal className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold tracking-[0.2em] text-copper-400">CATEGORIES</p>
+              <h2 className="mt-2 font-display text-2xl font-bold tracking-tight md:text-3xl">
+                دسته‌بندی‌ها
+              </h2>
+              <p className="mt-1 text-sm text-white/50">اسکرول افقی کنید و دسته مورد نظر را انتخاب کنید</p>
+            </div>
+            <Link
+              to="/categories"
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-copper-400 transition hover:border-copper-400/40 hover:bg-white/10 hover:text-copper-300"
+            >
+              همه دسته‌ها
+              <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
+            </Link>
           </Reveal>
-          <Reveal className="reveal-scope mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {categories.map((c, i) => (
-              <Link
-                key={c.id}
-                to={`/products?category=${c.id}`}
-                className="reveal group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 transition duration-300 hover:-translate-y-1 hover:border-copper-400/40 hover:bg-white/10"
-                style={{ transitionDelay: `${i * 70}ms` }}
-              >
-                <div className="aspect-[4/3] overflow-hidden bg-white/5">
-                  {c.image ? (
-                    <img
-                      src={mediaSrc(c.image)}
-                      alt={c.name}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <span className="font-display text-4xl font-bold text-white/15">{c.name?.slice(0, 1)}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="relative p-5">
-                  <div className="font-display text-lg font-bold">{c.name}</div>
-                  <p className="mt-2 line-clamp-2 text-xs leading-6 text-white/50">
-                    {c.description || 'مشاهده محصولات این دسته'}
-                  </p>
-                  <span className="mt-4 inline-flex text-xs font-semibold text-copper-400 transition group-hover:translate-x-[-4px]">
-                    ورود به دسته ←
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </Reveal>
+
+          <CategoryRail categories={categories} loading={loading} />
         </div>
       </section>
 

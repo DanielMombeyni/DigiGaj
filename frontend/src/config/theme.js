@@ -71,7 +71,7 @@ const CSS_MAP = {
 }
 
 export function resolveThemeColors(theme, colors = {}) {
-  const preset = THEME_PRESETS[theme] || THEME_PRESETS.classic
+  const preset = THEME_PRESETS[theme] || THEME_PRESETS.green
   const resolved = { ...preset }
   if (colors && typeof colors === 'object') {
     for (const key of Object.keys(CSS_MAP)) {
@@ -89,7 +89,7 @@ function hexToRgbChannels(hex) {
 }
 
 export function applyThemeToDocument(theme, colors = {}) {
-  const themeId = THEME_IDS.includes(theme) ? theme : 'classic'
+  const themeId = THEME_IDS.includes(theme) ? theme : 'green'
   const resolved = resolveThemeColors(themeId, colors)
   const root = document.documentElement
 

@@ -17,6 +17,26 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (
+            id.includes('react-dom') ||
+            id.includes('react-router') ||
+            id.includes('scheduler') ||
+            /[/\\]react[/\\]/.test(id)
+          ) {
+            return 'vendor-react'
+          }
+          if (id.includes('axios')) return 'vendor-axios'
+          if (id.includes('lucide-react')) return 'vendor-icons'
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,

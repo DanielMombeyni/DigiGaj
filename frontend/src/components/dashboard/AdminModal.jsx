@@ -118,15 +118,16 @@ export function ModalCancelButton({ onClick, children = 'انصراف', disabled
   )
 }
 
-export function ModalSubmitButton({ loading, children, disabled, form }) {
+export function ModalSubmitButton({ loading, children, disabled, form, type = 'submit', onClick }) {
   return (
     <button
-      type="submit"
+      type={type}
       form={form}
-      className="btn-primary min-h-10 cursor-pointer px-5"
+      onClick={onClick}
+      className="btn-primary min-h-10 cursor-pointer px-5 disabled:cursor-wait disabled:opacity-60"
       disabled={disabled || loading}
     >
-      {loading ? '...' : children}
+      {loading ? 'در حال ذخیره...' : children}
     </button>
   )
 }
