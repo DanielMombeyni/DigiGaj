@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from rest_framework import serializers, status, viewsets
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
@@ -100,12 +101,21 @@ class CustomerViewSet(viewsets.ModelViewSet):
         )
 
     def destroy(self, request, *args, **kwargs):
+        """Hard-delete customer. Orders/transactions keep snapshots (SET_NULL on FKs)."""
         user = self.get_object()
-        if user.orders.exists():
+        if user.is_staff or user.is_superuser:
             return Response(
-                {"detail": "این مشتری سفارش دارد و قابل حذف نیست."},
+                {"detail": "حذف کاربر ادمین از این بخش مجاز نیست."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        user.is_active = False
-        user.save(update_fields=["is_active"])
+        try:
+            with transaction.atomic():
+                user.delete()
+        except ProtectedError:
+            return Response(
+                {
+                    "detail": "حذف ممکن نیست؛ وابستگی محافظت‌شده‌ای باقی مانده است.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -142,9 +142,9 @@ export default function AdminCustomersPage() {
                   <AdminDeleteButton
                     onClick={async () => {
                       const ok = await confirm({
-                        title: 'غیرفعال کردن مشتری',
-                        description: `حساب «${u.username}» غیرفعال شود؟`,
-                        confirmLabel: 'تأیید',
+                        title: 'حذف مشتری',
+                        description: `حساب «${u.username}» حذف شود؟ سفارش‌ها و تراکنش‌های قبلی باقی می‌مانند و نام خریدار/محصول در تاریخچه حفظ می‌شود.`,
+                        confirmLabel: 'حذف مشتری',
                       })
                       if (!ok) return
                       try {

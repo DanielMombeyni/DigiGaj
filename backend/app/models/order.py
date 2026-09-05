@@ -19,7 +19,7 @@ class Order(TimeStampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="orders",
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
@@ -56,7 +56,11 @@ class Order(TimeStampedModel):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, related_name="items", on_delete=models.CASCADE)
     product = models.ForeignKey(
-        Product, related_name="order_items", on_delete=models.PROTECT
+        Product,
+        related_name="order_items",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     variant = models.ForeignKey(
         "app.ProductVariant",

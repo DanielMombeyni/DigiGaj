@@ -476,7 +476,7 @@ export default function AdminProductsPage() {
                   onClick={async () => {
                     const ok = await confirm({
                       title: 'حذف محصول',
-                      description: `آیا از حذف «${p.name}» مطمئن هستید؟`,
+                      description: `آیا از حذف «${p.name}» مطمئن هستید؟ در سفارش‌های قبلی نام محصول حفظ می‌شود.`,
                       confirmLabel: 'حذف محصول',
                     })
                     if (!ok) return

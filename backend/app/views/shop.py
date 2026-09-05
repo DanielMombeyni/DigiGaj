@@ -155,6 +155,12 @@ class ProductViewSet(viewsets.ModelViewSet):
             return ProductDetailSerializer
         return ProductListSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        """Delete product; order lines keep product_name (FK set null)."""
+        product = self.get_object()
+        product.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
     def images(self, request, slug=None):
         """Upload one or more images: files under `images` or `image`."""
