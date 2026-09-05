@@ -9,6 +9,8 @@ import Reveal from '@/components/common/Reveal'
 import ProductGridSection from '@/components/shop/ProductGridSection'
 import BrandLogo from '@/components/common/BrandLogo'
 import { brand } from '@/config/brand'
+import { isPriceOnRequest } from '@/utils/pricing'
+import PriceOnRequestNotice from '@/components/shop/PriceOnRequestNotice'
 
 export default function ProductDetailPage() {
   const { slug } = useParams()
@@ -60,6 +62,7 @@ export default function ProductDetailPage() {
   }, [product, colorId, sizeId])
 
   const price = selectedVariant?.effective_price ?? product?.price_toman
+  const onRequest = isPriceOnRequest(product)
   const stock = product?.has_options
     ? selectedVariant?.stock ?? 0
     : product?.stock ?? 0
@@ -201,51 +204,55 @@ export default function ProductDetailPage() {
           </div>
         )}
 
-        <div className="mt-8 flex flex-wrap items-end gap-3">
-          <div className="font-display text-3xl font-bold text-copper-600">
-            {toman(price)}
-          </div>
-          {product.compare_at_price_toman > price && (
+        <div className="mt-8">
+          {onRequest ? (
+            <PriceOnRequestNotice variant="detail" />
+          ) : (
             <>
-              <div className="pb-1 text-sm text-ink-700/40 line-through">
-                {toman(product.compare_at_price_toman)}
-              </div>
-              <span className="mb-1 rounded-lg bg-copper-500 px-2 py-1 text-xs font-bold text-white">
-                ٪
-                {Math.round(
-                  (1 - price / product.compare_at_price_toman) * 100,
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="font-display text-3xl font-bold text-copper-600">
+                  {toman(price)}
+                </div>
+                {product.compare_at_price_toman > price && (
+                  <>
+                    <div className="pb-1 text-sm text-ink-700/40 line-through">
+                      {toman(product.compare_at_price_toman)}
+                    </div>
+                    <span className="mb-1 rounded-lg bg-copper-500 px-2 py-1 text-xs font-bold text-white">
+                      ٪
+                      {Math.round(
+                        (1 - price / product.compare_at_price_toman) * 100,
+                      )}
+                      -
+                    </span>
+                  </>
                 )}
-                -
-              </span>
+              </div>
+              {product.has_options && (
+                <p className="mt-2 text-xs text-ink-700/45">
+                  {selectedVariant
+                    ? `موجودی این تنوع: ${stock}`
+                    : 'این ترکیب موجود نیست'}
+                </p>
+              )}
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="btn-primary min-h-11 cursor-pointer px-8"
+                  disabled={!canBuy}
+                  onClick={() =>
+                    add(product, 1, {
+                      variant_id: selectedVariant?.id || null,
+                      variant_label: selectedVariant?.label || '',
+                      price_toman: price,
+                    })
+                  }
+                >
+                  {canBuy ? 'افزودن به سبد' : 'ناموجود'}
+                </button>
+              </div>
             </>
           )}
-        </div>
-        {product.has_options && (
-          <p className="mt-2 text-xs text-ink-700/45">
-            {selectedVariant
-              ? `موجودی این تنوع: ${stock}`
-              : 'این ترکیب موجود نیست'}
-          </p>
-        )}
-
-        <div className="mt-8 flex flex-wrap gap-3">
-          <button
-            type="button"
-            className="btn-primary min-h-11 cursor-pointer px-8"
-            disabled={!canBuy}
-            onClick={() =>
-              add(product, 1, {
-                variant_id: selectedVariant?.id || null,
-                variant_label: selectedVariant?.label || '',
-                price_toman: price,
-              })
-            }
-          >
-            {canBuy ? 'افزودن به سبد' : 'ناموجود'}
-          </button>
-          <Link to="/products" className="btn-dark min-h-11 cursor-pointer">
-            ادامه خرید
-          </Link>
         </div>
 
         {(product.attributes || []).length > 0 && (

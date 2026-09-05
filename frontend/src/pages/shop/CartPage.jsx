@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { useCartStore } from '@/store/cart'
 import { toman, faDigits } from '@/utils/format'
+import { PRICE_ON_REQUEST_LABEL, isPriceOnRequest } from '@/utils/pricing'
 
 export default function CartPage() {
-  const { items, setQty, remove, total } = useCartStore()
+  const { items, setQty, remove, total, hasPriceOnRequest } = useCartStore()
 
   if (!items.length) {
     return (
@@ -15,9 +16,16 @@ export default function CartPage() {
     )
   }
 
+  const por = hasPriceOnRequest() || items.some((i) => isPriceOnRequest(i))
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="font-display text-3xl font-bold">سبد خرید</h1>
+      {por && (
+        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
+          برخی اقلام هنوز قیمت ثابت ندارند. با ثبت سفارش، تا اعلام قیمت توسط فروشگاه پرداخت انجام نمی‌شود.
+        </p>
+      )}
       <ul className="mt-8 space-y-4">
         {items.map((item) => (
           <li
@@ -31,7 +39,9 @@ export default function CartPage() {
               {item.variant_label && (
                 <div className="mt-0.5 text-xs text-ink-700/50">{item.variant_label}</div>
               )}
-              <div className="mt-1 text-sm text-copper-600">{toman(item.price_toman)}</div>
+              <div className="mt-1 text-sm text-copper-600">
+                {isPriceOnRequest(item) ? PRICE_ON_REQUEST_LABEL : toman(item.price_toman)}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <input
@@ -54,7 +64,10 @@ export default function CartPage() {
         ))}
       </ul>
       <div className="mt-8 flex items-center justify-between rounded-2xl bg-ink-950 px-5 py-4 text-white">
-        <span>جمع: {toman(total())} ({faDigits(items.length)} قلم)</span>
+        <span>
+          {por ? 'جمع اقلام قیمت‌دار: ' : 'جمع: '}
+          {toman(total())} ({faDigits(items.length)} قلم)
+        </span>
         <Link to="/checkout" className="btn-primary">ادامه خرید</Link>
       </div>
     </div>

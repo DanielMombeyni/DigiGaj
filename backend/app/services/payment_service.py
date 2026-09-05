@@ -46,10 +46,19 @@ class PaymentService:
         user = request.user if request.user.is_authenticated else None
 
         if order is not None:
+            pending = [
+                i.product_name for i in order.items.all() if i.price_pending
+            ]
+            if pending:
+                if len(pending) == 1:
+                    return None, f"محصول «{pending[0]}» قیمت ندارد"
+                return None, f"این محصولات قیمت ندارند: {'، '.join(pending)}"
             amount = order.total_toman
             order_id = order.order_number
             description = description or f"پرداخت سفارش {order.order_number}"
         elif product is not None:
+            if product.price_on_request:
+                return None, f"محصول «{product.name}» قیمت ندارد"
             amount = product.price_toman * max(1, quantity)
             order_id = f"PRD-{product.id}"
             description = description or f"خرید {product.name}"

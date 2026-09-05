@@ -7,6 +7,7 @@ from .product import Product
 
 class Order(TimeStampedModel):
     class Status(models.TextChoices):
+        AWAITING_PRICE = "awaiting_price", "در انتظار اعلام قیمت"
         PENDING = "pending", "در انتظار پرداخت"
         PAID = "paid", "پرداخت‌شده"
         PROCESSING = "processing", "در حال آماده‌سازی"
@@ -69,6 +70,11 @@ class OrderItem(models.Model):
     unit_price_toman = models.PositiveBigIntegerField()
     quantity = models.PositiveIntegerField(default=1)
     line_total_toman = models.PositiveBigIntegerField()
+    price_pending = models.BooleanField(
+        default=False,
+        verbose_name="در انتظار قیمت",
+        help_text="آیتم بدون قیمت ثابت؛ تا اعلام قیمت توسط ادمین قابل پرداخت نیست",
+    )
 
     def __str__(self):
         return f"{self.product_name} x{self.quantity}"

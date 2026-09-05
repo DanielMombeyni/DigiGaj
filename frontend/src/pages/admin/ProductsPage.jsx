@@ -6,6 +6,7 @@ import { mediaSrc } from '@/utils/media'
 import { AdminPageHeader, AdminTable, AdminEditButton, AdminDeleteButton } from '@/components/dashboard/AdminUI'
 import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/dashboard/AdminModal'
 import { useConfirm } from '@/components/common/ConfirmProvider'
+import { categorySelectOptions } from '@/utils/categories'
 
 const emptyForm = () => ({
   name: '',
@@ -13,6 +14,7 @@ const emptyForm = () => ({
   category: '',
   price_toman: '',
   discount_percent: '',
+  price_on_request: false,
   stock: 10,
   short_description: '',
   description: '',
@@ -225,15 +227,18 @@ export default function AdminProductsPage() {
     try {
       const { data } = await adminApi.products.get(p.slug)
       setEditing(data)
+      const onRequest =
+        Boolean(data.price_on_request) || Number(data.price_toman) === 0
+      setEditing(data)
       setForm({
         name: data.name || '',
         slug: data.slug || '',
         category: data.category || '',
-        price_toman: data.price_toman ?? '',
-        discount_percent: discountPercentFromCompare(
-          data.price_toman,
-          data.compare_at_price_toman,
-        ),
+        price_on_request: onRequest,
+        price_toman: onRequest ? '' : (data.price_toman ?? ''),
+        discount_percent: onRequest
+          ? ''
+          : discountPercentFromCompare(data.price_toman, data.compare_at_price_toman),
         stock: data.stock ?? 0,
         short_description: data.short_description || '',
         description: data.description || '',
@@ -312,11 +317,19 @@ export default function AdminProductsPage() {
     setError('')
     setLoading(true)
     const { discount_percent, ...formFields } = form
-    const compareAt = compareAtFromDiscount(form.price_toman, discount_percent)
+    const compareAt = form.price_on_request
+      ? null
+      : compareAtFromDiscount(form.price_toman, discount_percent)
+    if (!form.price_on_request && !(Number(form.price_toman) > 0)) {
+      setError('قیمت باید بیشتر از صفر باشد')
+      setLoading(false)
+      return
+    }
     const payload = {
       ...formFields,
       category: Number(form.category),
-      price_toman: Number(form.price_toman),
+      price_on_request: Boolean(form.price_on_request),
+      price_toman: form.price_on_request ? 0 : Number(form.price_toman),
       compare_at_price_toman: compareAt,
       stock: Number(form.stock) || 0,
       slug: form.slug || form.name.replace(/\s+/g, '-'),
@@ -342,7 +355,10 @@ export default function AdminProductsPage() {
         size_key: v.size_key || undefined,
         color_id: v.color_id || undefined,
         size_id: v.size_id || undefined,
-        price_toman: v.price_toman === '' || v.price_toman == null ? null : Number(v.price_toman),
+        price_toman:
+          form.price_on_request || v.price_toman === '' || v.price_toman == null
+            ? null
+            : Number(v.price_toman),
         stock: Number(v.stock) || 0,
         is_active: v.is_active !== false,
       })),
@@ -350,6 +366,8 @@ export default function AdminProductsPage() {
         .filter((a) => a.name.trim() && a.value.trim())
         .map((a, i) => ({ name: a.name.trim(), value: a.value.trim(), sort_order: i })),
     }
+    // Ensure boolean is never dropped / stringified oddly
+    payload.price_on_request = form.price_on_request === true
     try {
       let slug = editing?.slug
       if (editing) {
@@ -402,9 +420,15 @@ export default function AdminProductsPage() {
           <tr key={p.id} className="border-t border-mist-100 transition hover:bg-mist-50/80">
             <td className="px-4 py-3 font-medium">{p.name}</td>
             <td className="px-4 py-3">
-              {p.has_options && p.min_price != null && p.min_price !== p.price_toman
-                ? `از ${toman(p.min_price)}`
-                : toman(p.price_toman)}
+              {p.price_on_request || Number(p.price_toman) === 0 ? (
+                <span className="text-xs font-medium leading-5 text-amber-700">
+                  به دلیل نوسان قیمت با ما تماس بگیرید
+                </span>
+              ) : p.has_options && p.min_price != null && p.min_price !== p.price_toman ? (
+                `از ${toman(p.min_price)}`
+              ) : (
+                toman(p.price_toman)
+              )}
             </td>
             <td className="px-4 py-3">
               {disc ? (
@@ -496,20 +520,41 @@ export default function AdminProductsPage() {
               <span className="label">دسته‌بندی</span>
               <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
                 <option value="">انتخاب کنید</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                {categorySelectOptions(categories).map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4 cursor-pointer accent-copper-500"
+                checked={Boolean(form.price_on_request)}
+                onChange={(e) => {
+                  const checked = e.target.checked
+                  setForm((prev) => ({
+                    ...prev,
+                    price_on_request: checked,
+                    discount_percent: checked ? '' : prev.discount_percent,
+                    price_toman: checked ? '' : prev.price_toman,
+                  }))
+                }}
+              />
+              <span>
+                قیمت ثابت ندارد — نمایش «به دلیل نوسان قیمت با ما تماس بگیرید»
+              </span>
             </label>
             <label className="block">
               <span className="label">قیمت پایه (تومان)</span>
               <input
-                className="input"
+                className="input disabled:cursor-not-allowed disabled:bg-mist-50 disabled:text-ink-700/40"
                 type="number"
                 min="0"
-                value={form.price_toman}
+                value={form.price_on_request ? '' : form.price_toman}
                 onChange={(e) => setForm({ ...form, price_toman: e.target.value })}
-                required
+                required={!form.price_on_request}
+                disabled={Boolean(form.price_on_request)}
+                placeholder={form.price_on_request ? 'قیمت پس از تماس اعلام می‌شود' : ''}
               />
             </label>
             <label className="block">
@@ -523,8 +568,10 @@ export default function AdminProductsPage() {
                 value={form.discount_percent}
                 onChange={(e) => setForm({ ...form, discount_percent: e.target.value })}
                 placeholder="مثلاً ۱۵"
+                disabled={form.price_on_request}
               />
               {(() => {
+                if (form.price_on_request) return null
                 const before = compareAtFromDiscount(form.price_toman, form.discount_percent)
                 if (!before) return null
                 return (

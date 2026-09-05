@@ -20,6 +20,14 @@ export function OrderTrackingSteps({ status }) {
     )
   }
 
+  if (status === 'awaiting_price') {
+    return (
+      <p className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm leading-7 text-violet-800">
+        برخی اقلام این سفارش هنوز قیمت ندارند. پس از اعلام قیمت توسط فروشگاه می‌توانید پرداخت کنید.
+      </p>
+    )
+  }
+
   const currentIdx = ORDER_STATUS_FLOW.indexOf(status)
   const steps = ORDER_STATUS_FLOW.slice(1)
 

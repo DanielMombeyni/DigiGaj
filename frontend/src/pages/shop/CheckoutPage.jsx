@@ -113,10 +113,12 @@ export default function CheckoutPage() {
   const cartTotal = total()
   const discountAmount = appliedDiscount?.discount_toman || 0
   const payableTotal = Math.max(cartTotal - discountAmount, 0)
+  const hasPor = items.some((i) => i.price_on_request || Number(i.price_toman) === 0)
   const needsProfileFields = recipient === 'self' && profile && !profileIsComplete(profile)
   const atAddressLimit = addresses.length >= maxAddresses
   const selectedAddress = addresses.find((a) => a.id === selectedAddressId)
   const paymentAvailable = !loadingData && gateways.length > 0
+  const canSubmitOrder = hasPor || paymentAvailable
 
   useEffect(() => {
     if (!user) {
@@ -281,7 +283,8 @@ export default function CheckoutPage() {
       return
     }
     if (!items.length) return
-    if (!paymentAvailable) {
+    const hasPor = items.some((i) => i.price_on_request || Number(i.price_toman) === 0)
+    if (!hasPor && !paymentAvailable) {
       setError('درگاه پرداخت غیرفعال است.')
       return
     }
@@ -341,7 +344,7 @@ export default function CheckoutPage() {
         postal_code: selectedAddress.postal_code || '',
         notes: notes.trim(),
         discount_code: appliedDiscount?.code || undefined,
-        gateway: gateway || undefined,
+        gateway: hasPor ? undefined : gateway || undefined,
         platform: 'web',
       }
 
@@ -362,6 +365,13 @@ export default function CheckoutPage() {
       navigate(`/payment/result?status=success&order=${data.order?.order_number}`)
     } catch (err) {
       const detail = err.response?.data
+      if (detail?.price_pending && detail?.order?.id) {
+        clear()
+        navigate(`/account/orders/${detail.order.id}`, {
+          state: { flash: detail.detail || 'این محصول قیمت ندارد' },
+        })
+        return
+      }
       setError(
         detail?.detail ||
           detail?.payment_error ||
@@ -797,14 +807,16 @@ export default function CheckoutPage() {
             <button
               type="submit"
               className="btn-primary mt-5 w-full cursor-pointer py-3.5 disabled:opacity-50 sm:w-auto sm:min-w-56"
-              disabled={loading || !user || loadingData || !paymentAvailable}
-              title={!paymentAvailable && !loadingData ? 'درگاه پرداخت غیرفعال است' : undefined}
+              disabled={loading || !user || loadingData || !canSubmitOrder}
+              title={!canSubmitOrder && !loadingData ? 'درگاه پرداخت غیرفعال است' : undefined}
             >
-              {!paymentAvailable && !loadingData
+              {!canSubmitOrder && !loadingData
                 ? 'درگاه پرداخت غیرفعال است'
                 : loading
                   ? 'در حال ثبت...'
-                  : `پرداخت ${toman(payableTotal)}`}
+                  : hasPor
+                    ? 'ثبت سفارش (در انتظار قیمت)'
+                    : `پرداخت ${toman(payableTotal)}`}
             </button>
           </Section>
         </div>
@@ -843,7 +855,9 @@ export default function CheckoutPage() {
                       <div className="text-xs text-white/45">× {faDigits(item.quantity)}</div>
                     </div>
                     <div className="shrink-0 text-sm font-medium text-copper-300">
-                      {toman(item.price_toman * item.quantity)}
+                      {item.price_on_request || Number(item.price_toman) === 0
+                        ? 'به دلیل نوسان قیمت با ما تماس بگیرید'
+                        : toman(item.price_toman * item.quantity)}
                     </div>
                   </li>
                 )

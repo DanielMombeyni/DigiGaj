@@ -55,6 +55,7 @@ class OrderService:
             variant_id = row.get("variant_id")
             color_id = row.get("color_id")
             size_id = row.get("size_id")
+            price_pending = bool(product.price_on_request) or int(product.price_toman or 0) == 0
 
             if product.has_options:
                 variant = product.resolve_variant(
@@ -66,15 +67,15 @@ class OrderService:
                     return None, f"تنوع انتخاب‌شده برای «{product.name}» معتبر نیست"
                 if variant.stock < qty:
                     return None, f"موجودی «{product.name}» ({variant.label}) کافی نیست"
-                unit = product.resolve_price(variant)
+                unit = 0 if price_pending else product.resolve_price(variant)
             else:
                 if product.stock < qty:
                     return None, f"موجودی «{product.name}» کافی نیست"
-                unit = product.price_toman
+                unit = 0 if price_pending else product.price_toman
 
             line = unit * qty
             subtotal += line
-            order_items.append((product, variant, qty, unit, line))
+            order_items.append((product, variant, qty, unit, line, price_pending))
 
         discount_obj = None
         discount_amount = 0
@@ -88,9 +89,11 @@ class OrderService:
             discount_amount = discount_obj.calculate_discount(subtotal)
 
         total = max(0, subtotal - discount_amount + int(shipping_toman or 0))
+        has_pending = any(row[5] for row in order_items)
         order = Order.objects.create(
             user=user if user and user.is_authenticated else None,
             order_number=_order_number(),
+            status=Order.Status.AWAITING_PRICE if has_pending else Order.Status.PENDING,
             full_name=full_name,
             phone=phone,
             email=email,
@@ -105,7 +108,7 @@ class OrderService:
             shipping_toman=int(shipping_toman or 0),
             total_toman=total,
         )
-        for product, variant, qty, unit, line in order_items:
+        for product, variant, qty, unit, line, price_pending in order_items:
             OrderItem.objects.create(
                 order=order,
                 product=product,
@@ -115,6 +118,7 @@ class OrderService:
                 unit_price_toman=unit,
                 quantity=qty,
                 line_total_toman=line,
+                price_pending=price_pending,
             )
             if variant:
                 ProductVariant.objects.filter(pk=variant.pk).update(
@@ -133,3 +137,84 @@ class OrderService:
 
         queue_mail_event("order_created", "order", order.pk)
         return order, None
+
+    @classmethod
+    @transaction.atomic
+    def set_item_prices(cls, order: Order, items: list[dict]) -> tuple[Order | None, str | None]:
+        """Admin: set unit prices for price-pending (or adjustable) lines, then recalculate."""
+        if order.status in {
+            Order.Status.PAID,
+            Order.Status.SHIPPED,
+            Order.Status.DELIVERED,
+            Order.Status.REFUNDED,
+        }:
+            return None, "امکان تغییر قیمت این سفارش وجود ندارد"
+
+        by_id = {int(row["id"]): row for row in items if row.get("id") is not None}
+        if not by_id:
+            return None, "آیتمی برای به‌روزرسانی ارسال نشده است"
+
+        order_items = list(order.items.select_for_update().all())
+        found = {item.id for item in order_items}
+        missing = set(by_id) - found
+        if missing:
+            return None, "آیتم سفارش نامعتبر است"
+
+        for item in order_items:
+            if item.id not in by_id:
+                continue
+            raw = by_id[item.id].get("unit_price_toman")
+            try:
+                unit = int(raw)
+            except (TypeError, ValueError):
+                return None, f"قیمت نامعتبر برای «{item.product_name}»"
+            if unit < 1:
+                return None, f"قیمت «{item.product_name}» باید بیشتر از صفر باشد"
+            item.unit_price_toman = unit
+            item.line_total_toman = unit * item.quantity
+            item.price_pending = False
+            item.save(
+                update_fields=[
+                    "unit_price_toman",
+                    "line_total_toman",
+                    "price_pending",
+                ]
+            )
+
+        order_items = list(order.items.all())
+        subtotal = sum(i.line_total_toman for i in order_items)
+        discount_amount = 0
+        if order.discount_code_id:
+            discount_obj = order.discount_code
+            if discount_obj:
+                discount_amount = discount_obj.calculate_discount(subtotal)
+        total = max(0, subtotal - discount_amount + int(order.shipping_toman or 0))
+        still_pending = any(i.price_pending for i in order_items)
+        order.subtotal_toman = subtotal
+        order.discount_toman = discount_amount
+        order.total_toman = total
+        if not still_pending and order.status == Order.Status.AWAITING_PRICE:
+            order.status = Order.Status.PENDING
+        order.save(
+            update_fields=[
+                "subtotal_toman",
+                "discount_toman",
+                "total_toman",
+                "status",
+                "updated_at",
+            ]
+        )
+        return order, None
+
+    @classmethod
+    def pending_price_error(cls, order: Order) -> str | None:
+        pending = [
+            i.product_name
+            for i in order.items.all()
+            if i.price_pending
+        ]
+        if not pending:
+            return None
+        if len(pending) == 1:
+            return f"محصول «{pending[0]}» قیمت ندارد"
+        return f"این محصولات قیمت ندارند: {'، '.join(pending)}"

@@ -11,7 +11,11 @@ class Product(TimeStampedModel):
         REFURBISHED = "refurbished", "بازسازی‌شده"
 
     category = models.ForeignKey(
-        Category, related_name="products", on_delete=models.PROTECT
+        Category,
+        related_name="products",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     name = models.CharField(max_length=255, verbose_name="نام محصول")
     slug = models.SlugField(max_length=280, unique=True, allow_unicode=True)
@@ -24,6 +28,11 @@ class Product(TimeStampedModel):
     )
     price_toman = models.PositiveBigIntegerField(
         validators=[MinValueValidator(0)], verbose_name="قیمت پایه (تومان)"
+    )
+    price_on_request = models.BooleanField(
+        default=False,
+        verbose_name="قیمت با تماس",
+        help_text="اگر فعال باشد قیمت ثابت ندارد و باید با فروشگاه تماس گرفته شود",
     )
     compare_at_price_toman = models.PositiveBigIntegerField(
         null=True, blank=True, verbose_name="قیمت قبل تخفیف"

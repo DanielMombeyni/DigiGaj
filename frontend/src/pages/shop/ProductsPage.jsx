@@ -10,6 +10,7 @@ import Seo from '@/components/common/Seo'
 import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { useDebounce } from '@/hooks/useDebounce'
+import { categorySelectOptions } from '@/utils/categories'
 
 const SORT_OPTIONS = [
   { value: '-created_at', label: 'جدیدترین' },
@@ -71,7 +72,7 @@ export default function ProductsPage() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([shopApi.categories(), shopApi.productPriceStats()])
+    Promise.all([shopApi.categories({ page_size: 100 }), shopApi.productPriceStats()])
       .then(([catRes, statsRes]) => {
         if (cancelled) return
         const list = catRes.data.results || catRes.data
@@ -296,10 +297,7 @@ export default function ProductsPage() {
                   id="filter-category"
                   value={category}
                   onChange={setCategory}
-                  options={[
-                    { value: '', label: 'همه دسته‌ها' },
-                    ...categories.map((c) => ({ value: String(c.id), label: c.name })),
-                  ]}
+                  options={categorySelectOptions(categories, { includeRootLabel: true })}
                 />
 
                 <FilterSelect

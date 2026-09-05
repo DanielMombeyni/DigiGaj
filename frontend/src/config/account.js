@@ -1,4 +1,5 @@
 export const ORDER_STATUS = {
+  awaiting_price: { label: 'در انتظار اعلام قیمت', cls: 'border-violet-200 bg-violet-50 text-violet-700' },
   pending: { label: 'در انتظار پرداخت', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
   paid: { label: 'پرداخت‌شده', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
   processing: { label: 'در حال آماده‌سازی', cls: 'border-sea-500/30 bg-sea-500/10 text-sea-600' },

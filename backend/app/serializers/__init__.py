@@ -21,6 +21,14 @@ from app.services.product_options_service import ProductOptionsService
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    parent = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        allow_null=True,
+        required=False,
+    )
+    parent_name = serializers.SerializerMethodField()
+    children_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Category
         fields = (
@@ -30,9 +38,51 @@ class CategorySerializer(serializers.ModelSerializer):
             "description",
             "image",
             "parent",
+            "parent_name",
+            "children_count",
             "is_active",
             "sort_order",
         )
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        else:
+            data = dict(data)
+        parent = data.get("parent")
+        if parent in ("", "null", "None", None):
+            data["parent"] = None
+        return super().to_internal_value(data)
+
+    def validate_parent(self, parent):
+        if parent is None:
+            return parent
+        instance = getattr(self, "instance", None)
+        if instance and parent.pk == instance.pk:
+            raise serializers.ValidationError("دسته نمی‌تواند والد خودش باشد.")
+        if instance:
+            current = parent
+            seen = set()
+            while current is not None:
+                if current.pk == instance.pk:
+                    raise serializers.ValidationError(
+                        "نمی‌توانید یک زیرمجموعه را به‌عنوان والد انتخاب کنید."
+                    )
+                if current.pk in seen:
+                    break
+                seen.add(current.pk)
+                current = current.parent
+        return parent
+
+    def get_parent_name(self, obj):
+        parent = getattr(obj, "parent", None)
+        return parent.name if parent else None
+
+    def get_children_count(self, obj):
+        annotated = getattr(obj, "children_count", None)
+        if annotated is not None:
+            return annotated
+        return obj.children.count()
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -42,6 +92,16 @@ class CategorySerializer(serializers.ModelSerializer):
             else None
         )
         return data
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        if request is not None:
+            clear = request.data.get("clear_image")
+            if str(clear).lower() in ("1", "true", "yes"):
+                if instance.image:
+                    instance.image.delete(save=False)
+                validated_data["image"] = None
+        return super().update(instance, validated_data)
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
@@ -117,6 +177,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             "price_toman",
             "min_price",
             "compare_at_price_toman",
+            "price_on_request",
             "stock",
             "in_stock",
             "has_options",
@@ -137,6 +198,8 @@ class ProductListSerializer(serializers.ModelSerializer):
         return _abs_media(img.image.url, self.context.get("request"))
 
     def get_min_price(self, obj):
+        if obj.price_on_request:
+            return None
         prices = []
         for v in obj.variants.all():
             if not v.is_active:
@@ -245,6 +308,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "condition",
             "price_toman",
             "compare_at_price_toman",
+            "price_on_request",
             "stock",
             "is_active",
             "is_featured",
@@ -256,6 +320,24 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "variants",
             "attributes",
         )
+
+    def validate(self, attrs):
+        por = attrs.get(
+            "price_on_request",
+            getattr(self.instance, "price_on_request", False),
+        )
+        price = attrs.get(
+            "price_toman",
+            getattr(self.instance, "price_toman", None),
+        )
+        if por:
+            attrs["price_toman"] = 0
+            attrs["compare_at_price_toman"] = None
+        elif price is not None and int(price) <= 0:
+            raise serializers.ValidationError(
+                {"price_toman": "قیمت باید بیشتر از صفر باشد"}
+            )
+        return attrs
 
     def create(self, validated_data):
         options = {
@@ -317,12 +399,14 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "unit_price_toman",
             "quantity",
             "line_total_toman",
+            "price_pending",
         )
 
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     tracking_code = serializers.CharField(source="order_number", read_only=True)
+    has_price_pending = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -344,8 +428,13 @@ class OrderSerializer(serializers.ModelSerializer):
             "shipping_toman",
             "total_toman",
             "items",
+            "has_price_pending",
             "created_at",
         )
+
+    def get_has_price_pending(self, obj):
+        items = obj.items.all()
+        return any(i.price_pending for i in items)
 
 
 class CreateOrderSerializer(serializers.Serializer):

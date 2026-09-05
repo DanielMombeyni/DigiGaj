@@ -9,6 +9,7 @@ export const shopApi = {
   categories: (params) => api.get('/categories/', { params }),
   page: (slug) => api.get(`/pages/${slug}/`),
   checkout: (payload) => api.post('/orders/checkout/', payload),
+  payOrder: (id, payload) => api.post(`/orders/${id}/pay/`, payload),
   validateDiscount: (payload) => api.post('/discounts/validate_code/', payload),
   createTicket: (payload) => api.post('/tickets/', payload),
   orders: (params) => api.get('/orders/', { params }),
@@ -72,7 +73,7 @@ export const adminApi = {
     deleteImage: (slug, imageId) => api.delete(`/products/${slug}/images/${imageId}/`),
   },
   categories: {
-    list: () => api.get('/categories/'),
+    list: (params) => api.get('/categories/', { params: { page_size: 100, ...params } }),
     create: (data) => api.post('/categories/', data),
     update: (slug, data) => api.patch(`/categories/${slug}/`, data),
     remove: (slug) => api.delete(`/categories/${slug}/`),
@@ -90,7 +91,9 @@ export const adminApi = {
   },
   orders: {
     list: (params) => api.get('/orders/', { params }),
+    get: (id) => api.get(`/orders/${id}/`),
     setStatus: (id, status) => api.patch(`/orders/${id}/status/`, { status }),
+    setItemPrices: (id, items) => api.post(`/orders/${id}/set-item-prices/`, { items }),
   },
   tickets: {
     list: (params) => api.get('/tickets/', { params }),

@@ -71,21 +71,36 @@ from app.filters import ProductFilter
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all()
+    queryset = Category.objects.select_related("parent").all()
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
     required_admin_page = "categories"
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     lookup_field = "slug"
-    filter_backends = [SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["is_active"]
     search_fields = ["name", "slug"]
     ordering_fields = ["sort_order", "name"]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        from django.db.models import Count
+
+        qs = super().get_queryset().annotate(children_count=Count("children"))
         if not self.request.user.is_staff:
             qs = qs.filter(is_active=True)
+        parent = self.request.query_params.get("parent")
+        if parent is not None:
+            if parent in ("null", ""):
+                qs = qs.filter(parent__isnull=True)
+            elif str(parent).isdigit():
+                qs = qs.filter(parent_id=int(parent))
         return qs
+
+    def destroy(self, request, *args, **kwargs):
+        """Any category (including seed) is deletable; products become uncategorized."""
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -233,6 +248,57 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return Response(OrderSerializer(order, context={"request": request}).data)
 
+    @action(detail=True, methods=["post"], url_path="set-item-prices")
+    def set_item_prices(self, request, pk=None):
+        if not user_has_admin_page(request.user, "orders"):
+            return Response({"detail": "دسترسی ندارید"}, status=status.HTTP_403_FORBIDDEN)
+        order = self.get_object()
+        items = request.data.get("items") or []
+        if not isinstance(items, list):
+            return Response({"detail": "فرمت آیتم‌ها نامعتبر است"}, status=400)
+        order, err = OrderService.set_item_prices(order, items)
+        if err:
+            return Response({"detail": err}, status=400)
+        return Response(OrderSerializer(order, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="pay")
+    def pay(self, request, pk=None):
+        """Start payment for an existing order (after admin sets pending prices)."""
+        order = self.get_object()
+        pending_err = OrderService.pending_price_error(order)
+        if pending_err:
+            return Response({"detail": pending_err}, status=400)
+        if order.status != Order.Status.PENDING:
+            return Response(
+                {"detail": "این سفارش در وضعیت قابل پرداخت نیست"},
+                status=400,
+            )
+
+        platform = request.data.get("platform") or detect_platform(request)
+        enabled_gateways = PaymentFacade.list_enabled_public(request, platform)
+        if not enabled_gateways:
+            return Response({"detail": "درگاه پرداخت غیرفعال است."}, status=400)
+
+        gateway = request.data.get("gateway")
+        if not gateway:
+            return Response({"detail": "درگاه پرداخت را انتخاب کنید."}, status=400)
+        valid_types = {g["provider_type"] for g in enabled_gateways}
+        if gateway not in valid_types:
+            return Response({"detail": "درگاه پرداخت نامعتبر است."}, status=400)
+
+        pay, pay_err = PaymentService.create_purchase(
+            request=request,
+            gateway=gateway,
+            order=order,
+            platform=platform,
+            mobile=order.phone,
+        )
+        if pay_err:
+            return Response({"detail": pay_err}, status=400)
+        return Response(
+            {"order": OrderSerializer(order, context={"request": request}).data, "payment": pay}
+        )
+
     @action(detail=False, methods=["post"], permission_classes=[AllowAny])
     def checkout(self, request):
         ser = CreateOrderSerializer(data=request.data)
@@ -254,6 +320,18 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         )
         if err:
             return Response({"detail": err}, status=400)
+
+        pending_err = OrderService.pending_price_error(order)
+        if pending_err:
+            # Order is saved as awaiting_price so admin can set prices; no payment.
+            return Response(
+                {
+                    "detail": pending_err,
+                    "price_pending": True,
+                    "order": OrderSerializer(order, context={"request": request}).data,
+                },
+                status=400,
+            )
 
         platform = data.get("platform") or detect_platform(request)
         enabled_gateways = PaymentFacade.list_enabled_public(request, platform)
@@ -286,7 +364,6 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             )
         result["payment"] = pay
         return Response(result, status=201)
-
 
 class AccountingViewSet(viewsets.ModelViewSet):
     queryset = AccountingEntry.objects.all()
@@ -384,7 +461,9 @@ def product_price_stats(request):
             qs = qs.filter(category_id=int(category))
         else:
             qs = qs.filter(category__slug=category)
-    agg = qs.aggregate(min_price=Min("price_toman"), max_price=Max("price_toman"))
+    agg = qs.filter(price_on_request=False).aggregate(
+        min_price=Min("price_toman"), max_price=Max("price_toman")
+    )
     return Response(
         {
             "min_price": agg["min_price"] or 0,

@@ -102,6 +102,17 @@ export function organizationJsonLd(contact = {}) {
 
 export function productJsonLd(product) {
   if (!product) return null
+  const onRequest = Boolean(product.price_on_request) || Number(product.price_toman) === 0
+  const offer = {
+    '@type': 'Offer',
+    priceCurrency: 'IRR',
+    availability: product.in_stock
+      ? 'https://schema.org/InStock'
+      : 'https://schema.org/OutOfStock',
+  }
+  if (!onRequest) {
+    offer.price = String(Number(product.price_toman || 0) * 10)
+  }
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -109,13 +120,6 @@ export function productJsonLd(product) {
     description: product.short_description || product.description || product.name,
     brand: product.brand ? { '@type': 'Brand', name: product.brand } : undefined,
     image: product.primary_image || undefined,
-    offers: {
-      '@type': 'Offer',
-      priceCurrency: 'IRR',
-      price: String(product.price_toman * 10),
-      availability: product.in_stock
-        ? 'https://schema.org/InStock'
-        : 'https://schema.org/OutOfStock',
-    },
+    offers: offer,
   }
 }
