@@ -61,6 +61,7 @@ export const adminApi = {
   },
   products: {
     list: (params) => api.get('/products/', { params }),
+    categoryCounts: () => api.get('/products/category-counts/'),
     get: (slug) => api.get(`/products/${slug}/`),
     create: (data) => api.post('/products/', data),
     update: (slug, data) => api.patch(`/products/${slug}/`, data),

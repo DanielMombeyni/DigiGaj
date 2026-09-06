@@ -62,7 +62,7 @@ from app.services.public_pages import (
     save_site_icon,
     save_storefront_home,
 )
-from app.permissions import IsAdminOrReadOnly, HasAdminPage, require_admin_page
+from app.permissions import IsAdminOrReadOnly, HasAdminPage, IsStaffUser, require_admin_page
 from app.services.staff_access import user_has_admin_page
 from app.services.order_service import OrderService
 from app.services.payment_service import PaymentService
@@ -163,6 +163,28 @@ class ProductViewSet(viewsets.ModelViewSet):
         product = self.get_object()
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="category-counts",
+        permission_classes=[IsStaffUser],
+    )
+    def category_counts(self, request):
+        """Lightweight counts per category for admin product grouping."""
+        qs = Product.objects.all()
+        rows = qs.values("category_id").annotate(count=Count("id"))
+        counts = {}
+        total = 0
+        for row in rows:
+            key = (
+                "uncategorized"
+                if row["category_id"] is None
+                else str(row["category_id"])
+            )
+            counts[key] = row["count"]
+            total += row["count"]
+        return Response({"counts": counts, "total": total})
 
     @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
     def images(self, request, slug=None):

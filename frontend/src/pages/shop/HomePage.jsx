@@ -345,14 +345,14 @@ export default function HomePage() {
         {loading ? (
           <SkeletonGrid />
         ) : (
-          <Reveal className="reveal-scope grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {featured.map((p, i) => (
-              <ProductCard key={p.id} product={p} index={i} />
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {featured.map((p) => (
+              <ProductCard key={p.id} product={p} />
             ))}
             {!featured.length && (
               <p className="col-span-full text-sm text-ink-700/50">هنوز محصول ویژه‌ای ثبت نشده است.</p>
             )}
-          </Reveal>
+          </div>
         )}
       </section>
 

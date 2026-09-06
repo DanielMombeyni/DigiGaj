@@ -20,6 +20,8 @@ def category_with_descendants(category_id: int) -> list[int]:
 
 class ProductFilter(django_filters.FilterSet):
     category = django_filters.NumberFilter(method="filter_category")
+    category_exact = django_filters.NumberFilter(field_name="category_id")
+    uncategorized = django_filters.BooleanFilter(method="filter_uncategorized")
     min_price = django_filters.NumberFilter(field_name="price_toman", lookup_expr="gte")
     max_price = django_filters.NumberFilter(field_name="price_toman", lookup_expr="lte")
     min_rating = django_filters.NumberFilter(field_name="rating", lookup_expr="gte")
@@ -32,6 +34,8 @@ class ProductFilter(django_filters.FilterSet):
         model = Product
         fields = (
             "category",
+            "category_exact",
+            "uncategorized",
             "min_price",
             "max_price",
             "min_rating",
@@ -45,6 +49,11 @@ class ProductFilter(django_filters.FilterSet):
         if value is None:
             return queryset
         return queryset.filter(category_id__in=category_with_descendants(value))
+
+    def filter_uncategorized(self, queryset, name, value):
+        if value:
+            return queryset.filter(category__isnull=True)
+        return queryset
 
     def filter_queryset(self, queryset):
         qs = super().filter_queryset(queryset)

@@ -1,13 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, X, ImagePlus, ImageOff, FolderOpen, FolderX, ChevronDown } from 'lucide-react'
+import {
+  Plus,
+  X,
+  ImagePlus,
+  ImageOff,
+  FolderOpen,
+  FolderX,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  Layers,
+  Search,
+  ChevronsUpDown,
+} from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { faDigits, toman } from '@/utils/format'
 import { mediaSrc } from '@/utils/media'
-import { AdminPageHeader, AdminTable, AdminEditButton, AdminDeleteButton } from '@/components/dashboard/AdminUI'
+import {
+  AdminPageHeader,
+  AdminTable,
+  AdminEditButton,
+  AdminDeleteButton,
+  AdminStatCard,
+} from '@/components/dashboard/AdminUI'
 import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/dashboard/AdminModal'
 import ProductImageLightbox from '@/components/dashboard/ProductImageLightbox'
 import { useConfirm } from '@/components/common/ConfirmProvider'
 import { categorySelectOptions } from '@/utils/categories'
+import { fetchAllPages } from '@/utils/pagination'
+import LoadingScreen from '@/components/common/LoadingScreen'
 
 const emptyForm = () => ({
   name: '',
@@ -104,53 +126,63 @@ function buildVariantRows(colors, sizes, prev = []) {
   return rows
 }
 
-const UNCATEGORIZED_KEY = '__uncategorized__'
+const UNCATEGORIZED_KEY = 'uncategorized'
+const GROUP_PAGE_SIZE = 20
 
-function buildProductGroups(products, categories) {
-  const byCat = new Map()
-  for (const p of products) {
-    const key = p.category == null || p.category === '' ? UNCATEGORIZED_KEY : String(p.category)
-    if (!byCat.has(key)) byCat.set(key, [])
-    byCat.get(key).push(p)
-  }
-
+function buildGroupMeta(categories, counts) {
   const ordered = []
   const catOpts = categorySelectOptions(categories)
   const used = new Set()
 
   for (const opt of catOpts) {
     const key = String(opt.id)
-    const items = byCat.get(key)
-    if (!items?.length) continue
+    const count = Number(counts[key]) || 0
+    if (!count) continue
     used.add(key)
     ordered.push({
       key,
+      categoryId: opt.id,
       title: opt.label.replace(/^—+\s*/, ''),
       depth: opt.depth || 0,
       fullLabel: opt.label,
-      items,
+      count,
     })
   }
 
-  for (const [key, items] of byCat.entries()) {
-    if (key === UNCATEGORIZED_KEY || used.has(key) || !items.length) continue
-    const name = items[0]?.category_name || `دسته #${key}`
-    ordered.push({ key, title: name, depth: 0, fullLabel: name, items })
+  for (const [key, raw] of Object.entries(counts)) {
+    const count = Number(raw) || 0
+    if (!count || key === UNCATEGORIZED_KEY || used.has(key)) continue
+    ordered.push({
+      key,
+      categoryId: Number(key) || null,
+      title: `دسته #${key}`,
+      depth: 0,
+      fullLabel: `دسته #${key}`,
+      count,
+    })
   }
 
-  const uncategorized = byCat.get(UNCATEGORIZED_KEY) || []
-  if (uncategorized.length) {
+  const uncategorizedCount = Number(counts[UNCATEGORIZED_KEY]) || 0
+  if (uncategorizedCount) {
     ordered.push({
       key: UNCATEGORIZED_KEY,
+      categoryId: null,
       title: 'بدون دسته‌بندی',
       depth: 0,
       fullLabel: 'بدون دسته‌بندی',
-      items: uncategorized,
+      count: uncategorizedCount,
       uncategorized: true,
     })
   }
 
   return ordered
+}
+
+function groupListParams(key, page) {
+  const params = { page, page_size: GROUP_PAGE_SIZE }
+  if (key === UNCATEGORIZED_KEY) params.uncategorized = true
+  else params.category_exact = key
+  return params
 }
 
 function ProductRow({ p, busy, onOpenGallery, onToggleInStock, onToggleActive, onEdit, onDelete }) {
@@ -168,13 +200,13 @@ function ProductRow({ p, busy, onOpenGallery, onToggleInStock, onToggleActive, o
         : []
 
   return (
-    <tr className="border-t border-mist-100 transition hover:bg-mist-50/80">
-      <td className="px-4 py-3">
+    <tr className="border-t border-mist-100/90 transition hover:bg-gradient-to-l hover:from-mist-50/90 hover:to-transparent">
+      <td className="px-4 py-3.5">
         <div className="flex items-center gap-3">
           {thumb ? (
             <button
               type="button"
-              className="group relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-mist-200 bg-mist-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
+              className="group relative h-12 w-12 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-mist-200 bg-mist-50 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
               onClick={() =>
                 onOpenGallery({
                   title: p.name,
@@ -188,12 +220,12 @@ function ProductRow({ p, busy, onOpenGallery, onToggleInStock, onToggleActive, o
               <img
                 src={mediaSrc(thumb)}
                 alt=""
-                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
                 loading="lazy"
               />
               {galleryImages.length > 1 && (
-                <span className="absolute inset-x-0 bottom-0 bg-ink-950/70 py-0.5 text-center text-[9px] font-bold text-white">
-                  {galleryImages.length}
+                <span className="absolute inset-x-0 bottom-0 bg-ink-950/75 py-0.5 text-center text-[9px] font-bold text-white">
+                  {faDigits(galleryImages.length)}
                 </span>
               )}
             </button>
@@ -205,60 +237,74 @@ function ProductRow({ p, busy, onOpenGallery, onToggleInStock, onToggleActive, o
               <ImageOff className="h-4 w-4" strokeWidth={1.75} />
             </div>
           )}
-          <span className="min-w-0 font-medium text-ink-900">{p.name}</span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="truncate font-semibold text-ink-900">{p.name}</span>
+              {p.is_featured ? (
+                <span className="rounded-md bg-copper-50 px-1.5 py-0.5 text-[10px] font-bold text-copper-600">
+                  ویژه
+                </span>
+              ) : null}
+            </div>
+            {p.slug ? (
+              <div className="mt-0.5 truncate text-[11px] text-ink-700/40" dir="ltr">
+                {p.slug}
+              </div>
+            ) : null}
+          </div>
         </div>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         {p.price_on_request || Number(p.price_toman) === 0 ? (
-          <span className="text-xs font-medium leading-5 text-amber-700">
-            به دلیل نوسان قیمت با ما تماس بگیرید
+          <span className="inline-flex max-w-[11rem] rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-medium leading-4 text-amber-800">
+            قیمت با تماس
           </span>
         ) : p.has_options && p.min_price != null && p.min_price !== p.price_toman ? (
-          `از ${toman(p.min_price)}`
+          <span className="tabular-nums text-ink-800">از {toman(p.min_price)}</span>
         ) : (
-          toman(p.price_toman)
+          <span className="font-semibold tabular-nums text-ink-900">{toman(p.price_toman)}</span>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         {disc ? (
-          <span className="rounded-lg bg-copper-50 px-2 py-1 text-xs font-semibold text-copper-600">
-            ٪{disc}
+          <span className="inline-flex rounded-full bg-copper-500/10 px-2.5 py-1 text-xs font-bold text-copper-600">
+            ٪{faDigits(disc)}
           </span>
         ) : (
-          <span className="text-ink-700/35">—</span>
+          <span className="text-ink-700/30">—</span>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         <button
           type="button"
           disabled={busy}
           onClick={() => onToggleInStock(p)}
           title={p.in_stock ? 'کلیک برای ناموجود کردن' : 'کلیک برای موجود کردن'}
-          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60 ${
+          className={`cursor-pointer rounded-full px-3 py-1 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
             p.in_stock
-              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+              ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70 hover:bg-emerald-100'
+              : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/70 hover:bg-amber-100'
           }`}
         >
           {p.in_stock ? 'موجود' : 'ناموجود'}
         </button>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         <button
           type="button"
           disabled={busy}
           onClick={() => onToggleActive(p)}
           title={p.is_active ? 'کلیک برای غیرفعال کردن' : 'کلیک برای فعال کردن'}
-          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium transition disabled:cursor-wait disabled:opacity-60 ${
+          className={`cursor-pointer rounded-full px-3 py-1 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
             p.is_active
-              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-              : 'bg-mist-100 text-ink-700/50 hover:bg-mist-200'
+              ? 'bg-sea-500/10 text-sea-600 ring-1 ring-sea-500/20 hover:bg-sea-500/15'
+              : 'bg-mist-100 text-ink-700/45 ring-1 ring-mist-200 hover:bg-mist-200'
           }`}
         >
           {p.is_active ? 'فعال' : 'غیرفعال'}
         </button>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-4 py-3.5">
         <div className="flex items-center justify-end gap-1">
           <AdminEditButton onClick={() => onEdit(p)} />
           <AdminDeleteButton onClick={() => onDelete(p)} />
@@ -283,8 +329,10 @@ function firstFormError(data) {
 export default function AdminProductsPage() {
   const confirm = useConfirm()
   const formReqId = useRef(0)
-  const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
+  const [counts, setCounts] = useState({})
+  const [totalProducts, setTotalProducts] = useState(0)
+  const [groupData, setGroupData] = useState({})
   const [form, setForm] = useState(emptyForm)
   const [colors, setColors] = useState([])
   const [sizes, setSizes] = useState([])
@@ -300,26 +348,103 @@ export default function AdminProductsPage() {
   const [error, setError] = useState('')
   const [tableError, setTableError] = useState('')
   const [expanded, setExpanded] = useState({})
+  const [listLoading, setListLoading] = useState(true)
+  const [groupQuery, setGroupQuery] = useState('')
+
+  const groups = useMemo(() => buildGroupMeta(categories, counts), [categories, counts])
+  const uncategorizedCount = Number(counts[UNCATEGORIZED_KEY]) || 0
+
+  const visibleGroups = useMemo(() => {
+    const q = groupQuery.trim()
+    if (!q) return groups
+    return groups.filter((g) => g.fullLabel.includes(q) || g.title.includes(q))
+  }, [groups, groupQuery])
+
+  const loadMeta = ({ soft = false } = {}) => {
+    if (!soft) setListLoading(true)
+    setTableError('')
+    Promise.all([
+      fetchAllPages((params) => adminApi.categories.list(params), {}, { pageSize: 200 }),
+      adminApi.products.categoryCounts(),
+    ])
+      .then(([categoryRows, countsRes]) => {
+        setCategories(categoryRows)
+        setCounts(countsRes.data?.counts || {})
+        setTotalProducts(Number(countsRes.data?.total) || 0)
+      })
+      .catch((err) => {
+        setTableError(err.response?.data?.detail || 'خطا در بارگذاری محصولات')
+      })
+      .finally(() => {
+        if (!soft) setListLoading(false)
+      })
+  }
+
+  const loadGroup = async (key, page = 1) => {
+    setGroupData((prev) => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), page, loading: true },
+    }))
+    try {
+      const { data } = await adminApi.products.list(groupListParams(key, page))
+      const results = data.results || data || []
+      const count = typeof data.count === 'number' ? data.count : results.length
+      setGroupData((prev) => ({
+        ...prev,
+        [key]: { page, results, count, loading: false },
+      }))
+      setCounts((prev) => ({ ...prev, [key]: count }))
+    } catch (err) {
+      setGroupData((prev) => ({
+        ...prev,
+        [key]: { ...(prev[key] || {}), page, loading: false, results: prev[key]?.results || [] },
+      }))
+      setTableError(err.response?.data?.detail || 'خطا در بارگذاری محصولات دسته')
+    }
+  }
 
   const load = () => {
-    adminApi.products.list({ page_size: 100 }).then((r) => setProducts(r.data.results || r.data))
-    adminApi.categories.list({ page_size: 100 }).then((r) => setCategories(r.data.results || r.data))
+    setGroupData({})
+    setExpanded({})
+    loadMeta()
   }
 
   useEffect(() => {
-    load()
+    loadMeta()
   }, [])
 
-  const groups = useMemo(() => buildProductGroups(products, categories), [products, categories])
-
   const toggleGroup = (key) => {
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
+    const willOpen = !expanded[key]
+    setExpanded((prev) => ({ ...prev, [key]: willOpen }))
+    if (willOpen) loadGroup(key, groupData[key]?.page || 1)
+  }
+
+  const expandAll = () => {
+    const next = {}
+    for (const g of visibleGroups) {
+      next[g.key] = true
+      if (!groupData[g.key]?.results) loadGroup(g.key, 1)
+    }
+    setExpanded((prev) => ({ ...prev, ...next }))
+  }
+
+  const collapseAll = () => {
+    setExpanded({})
   }
 
   const patchLocal = (slug, patch) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.slug === slug ? { ...p, ...patch } : p)),
-    )
+    setGroupData((prev) => {
+      const next = { ...prev }
+      for (const [key, bucket] of Object.entries(prev)) {
+        if (!bucket?.results?.length) continue
+        const idx = bucket.results.findIndex((p) => p.slug === slug)
+        if (idx === -1) continue
+        const results = [...bucket.results]
+        results[idx] = { ...results[idx], ...patch }
+        next[key] = { ...bucket, results }
+      }
+      return next
+    })
   }
 
   const toggleActive = async (p) => {
@@ -599,116 +724,272 @@ export default function AdminProductsPage() {
     <div className="animate-rise space-y-6">
       <AdminPageHeader
         title="محصولات"
-        description="محصولات به‌تفکیک دسته‌بندی — تصاویر، رنگ، سایز و ویژگی‌ها"
+        description="مدیریت کاتالوگ به‌تفکیک دسته — باز کنید، ویرایش کنید، صفحه‌بندی کنید"
         actions={
-          <button type="button" className="btn-primary cursor-pointer" onClick={openCreate}>
+          <button
+            type="button"
+            className="btn-primary inline-flex cursor-pointer items-center gap-2"
+            onClick={openCreate}
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} />
             افزودن محصول
           </button>
         }
       />
 
+      {!listLoading && groups.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <AdminStatCard
+            label="کل محصولات"
+            value={faDigits(totalProducts)}
+            hint="فعال و غیرفعال"
+            accent="copper"
+          />
+          <AdminStatCard
+            label="گروه‌های دارای محصول"
+            value={faDigits(groups.length)}
+            hint="دسته‌ها و زیردسته‌ها"
+            accent="sea"
+          />
+          <AdminStatCard
+            label="بدون دسته‌بندی"
+            value={faDigits(uncategorizedCount)}
+            hint={uncategorizedCount ? 'نیاز به تخصیص دسته' : 'همه دسته‌بندی شده‌اند'}
+            accent={uncategorizedCount ? 'amber' : 'emerald'}
+          />
+        </div>
+      )}
+
       {tableError && (
         <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{tableError}</p>
       )}
 
-      {!products.length ? (
-        <div className="rounded-2xl border border-dashed border-mist-200 bg-surface px-6 py-14 text-center text-sm text-ink-700/50">
-          هنوز محصولی ثبت نشده است.
+      {listLoading ? (
+        <LoadingScreen variant="page" label="در حال بارگذاری دسته‌بندی‌ها..." />
+      ) : !groups.length ? (
+        <div className="relative overflow-hidden rounded-3xl border border-dashed border-mist-200 bg-gradient-to-bl from-mist-50 to-surface px-6 py-16 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-950 text-copper-400">
+            <Package className="h-6 w-6" strokeWidth={1.75} />
+          </div>
+          <p className="mt-4 font-display text-lg font-bold text-ink-900">هنوز محصولی ثبت نشده</p>
+          <p className="mt-2 text-sm text-ink-700/50">اولین محصول را اضافه کنید تا گروه‌ها اینجا ساخته شوند.</p>
+          <button type="button" className="btn-primary mt-6 cursor-pointer" onClick={openCreate}>
+            افزودن محصول
+          </button>
         </div>
       ) : (
-        <div className="space-y-5">
-          {groups.map((group) => {
-            const isOpen = Boolean(expanded[group.key])
-            return (
-              <section
-                key={group.key}
-                className={`overflow-hidden rounded-2xl border shadow-soft ${
-                  group.uncategorized
-                    ? 'border-amber-200/80 bg-amber-50/30'
-                    : 'border-mist-200/80 bg-surface'
-                }`}
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 rounded-2xl border border-mist-200/80 bg-surface/90 p-3 shadow-soft backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:p-4">
+            <label className="relative min-w-0 flex-1">
+              <span className="sr-only">جستجوی دسته</span>
+              <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-700/35" />
+              <input
+                className="input w-full !pr-10"
+                placeholder="جستجو در نام دسته‌ها..."
+                value={groupQuery}
+                onChange={(e) => setGroupQuery(e.target.value)}
+              />
+            </label>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={expandAll}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-mist-200 bg-white px-3 py-2 text-xs font-semibold text-ink-700/70 transition hover:border-copper-400/40 hover:text-copper-600"
               >
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(group.key)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3 text-start transition hover:bg-mist-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-400"
-                  aria-expanded={isOpen}
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                        group.uncategorized
-                          ? 'bg-amber-100 text-amber-700'
-                          : 'bg-ink-950 text-copper-400'
-                      }`}
-                    >
-                      {group.uncategorized ? (
-                        <FolderX className="h-4 w-4" strokeWidth={1.75} />
-                      ) : (
-                        <FolderOpen className="h-4 w-4" strokeWidth={1.75} />
-                      )}
-                    </span>
-                    <div className="min-w-0">
-                      <h2
-                        className={`font-display text-sm font-bold sm:text-base ${
-                          group.uncategorized ? 'text-amber-900' : 'text-ink-900'
-                        }`}
-                        style={group.depth ? { paddingInlineStart: `${group.depth * 0.75}rem` } : undefined}
-                      >
-                        {group.fullLabel}
-                      </h2>
-                      {group.uncategorized && (
-                        <p className="mt-0.5 text-[11px] text-amber-800/70">
-                          این محصولات در فروشگاه بدون دسته دیده می‌شوند — از ویرایش، دسته انتخاب کنید.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span
-                      className={`rounded-lg px-2 py-1 text-xs font-semibold tabular-nums ${
-                        group.uncategorized
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-mist-100 text-ink-700/70'
-                      }`}
-                    >
-                      {faDigits(group.items.length)} محصول
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 text-ink-700/40 transition ${isOpen ? 'rotate-180' : ''}`}
-                      strokeWidth={2}
-                    />
-                  </div>
-                </button>
+                <ChevronsUpDown className="h-3.5 w-3.5" strokeWidth={2} />
+                باز کردن همه
+              </button>
+              <button
+                type="button"
+                onClick={collapseAll}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-mist-200 bg-white px-3 py-2 text-xs font-semibold text-ink-700/70 transition hover:border-mist-300 hover:text-ink-900"
+              >
+                بستن همه
+              </button>
+            </div>
+          </div>
 
-                {isOpen && (
-                  <AdminTable embedded columns={['نام', 'قیمت', 'تخفیف', 'موجودی', 'وضعیت', '']}>
-                    {group.items.map((p) => (
-                      <ProductRow
-                        key={p.id}
-                        p={p}
-                        busy={rowBusy === p.slug}
-                        onOpenGallery={setGallery}
-                        onToggleInStock={toggleInStock}
-                        onToggleActive={toggleActive}
-                        onEdit={openEdit}
-                        onDelete={async (product) => {
-                          const ok = await confirm({
-                            title: 'حذف محصول',
-                            description: `آیا از حذف «${product.name}» مطمئن هستید؟ در سفارش‌های قبلی نام محصول حفظ می‌شود.`,
-                            confirmLabel: 'حذف محصول',
-                          })
-                          if (!ok) return
-                          await adminApi.products.remove(product.slug)
-                          load()
-                        }}
-                      />
-                    ))}
-                  </AdminTable>
-                )}
-              </section>
-            )
-          })}
+          {!visibleGroups.length ? (
+            <div className="rounded-2xl border border-dashed border-mist-200 bg-mist-50/50 px-4 py-10 text-center text-sm text-ink-700/50">
+              دسته‌ای با این جستجو پیدا نشد.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {visibleGroups.map((group, idx) => {
+                const isOpen = Boolean(expanded[group.key])
+                const bucket = groupData[group.key]
+                const items = bucket?.results || []
+                const total = bucket?.count ?? group.count
+                const page = bucket?.page || 1
+                const totalPages = Math.max(1, Math.ceil(total / GROUP_PAGE_SIZE) || 1)
+                const groupLoading = Boolean(bucket?.loading)
+                return (
+                  <section
+                    key={group.key}
+                    className={`group/acc overflow-hidden rounded-2xl border shadow-soft transition duration-300 ${
+                      group.uncategorized
+                        ? 'border-amber-200/90 bg-gradient-to-l from-amber-50/80 to-surface'
+                        : isOpen
+                          ? 'border-copper-400/30 bg-surface ring-1 ring-copper-400/15'
+                          : 'border-mist-200/80 bg-surface hover:border-mist-300'
+                    }`}
+                    style={{ animationDelay: `${Math.min(idx, 8) * 40}ms` }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(group.key)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-start transition hover:bg-mist-50/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-400 sm:px-5"
+                      aria-expanded={isOpen}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span
+                          className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition ${
+                            group.uncategorized
+                              ? 'bg-amber-100 text-amber-700'
+                              : isOpen
+                                ? 'bg-ink-950 text-copper-400 shadow-[0_8px_20px_rgba(15,23,42,0.2)]'
+                                : 'bg-mist-100 text-ink-700/55 group-hover/acc:bg-ink-950 group-hover/acc:text-copper-400'
+                          }`}
+                        >
+                          {group.uncategorized ? (
+                            <FolderX className="h-5 w-5" strokeWidth={1.75} />
+                          ) : (
+                            <FolderOpen className="h-5 w-5" strokeWidth={1.75} />
+                          )}
+                          {group.depth > 0 && !group.uncategorized ? (
+                            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-sea-500" />
+                          ) : null}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h2
+                              className={`truncate font-display text-sm font-bold sm:text-base ${
+                                group.uncategorized ? 'text-amber-950' : 'text-ink-900'
+                              }`}
+                              style={
+                                group.depth
+                                  ? { paddingInlineStart: `${Math.min(group.depth, 4) * 0.5}rem` }
+                                  : undefined
+                              }
+                            >
+                              {group.fullLabel}
+                            </h2>
+                            {group.depth > 0 ? (
+                              <span className="rounded-md bg-sea-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sea-600">
+                                زیردسته
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-ink-700/45">
+                            {group.uncategorized
+                              ? 'برای نمایش بهتر در فروشگاه، دسته انتخاب کنید'
+                              : isOpen
+                                ? `صفحه ${faDigits(page)} از ${faDigits(totalPages)}`
+                                : 'برای دیدن محصولات کلیک کنید'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
+                            group.uncategorized
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-mist-100 text-ink-700/65'
+                          }`}
+                        >
+                          <Layers className="h-3 w-3 opacity-60" strokeWidth={2} />
+                          {faDigits(group.count)}
+                        </span>
+                        <span
+                          className={`flex h-8 w-8 items-center justify-center rounded-xl transition ${
+                            isOpen ? 'bg-copper-500/10 text-copper-600' : 'bg-mist-50 text-ink-700/35'
+                          }`}
+                        >
+                          <ChevronDown
+                            className={`h-4 w-4 transition duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                            strokeWidth={2}
+                          />
+                        </span>
+                      </div>
+                    </button>
+
+                    <div
+                      className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                        isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                      }`}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        {groupLoading && !items.length ? (
+                          <div className="space-y-2 border-t border-mist-100 px-4 py-5 sm:px-5">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                              <div key={i} className="h-14 animate-pulse rounded-xl bg-mist-100/80" />
+                            ))}
+                          </div>
+                        ) : (
+                          <>
+                            <AdminTable embedded columns={['نام', 'قیمت', 'تخفیف', 'موجودی', 'وضعیت', '']}>
+                              {items.map((p) => (
+                                <ProductRow
+                                  key={p.id}
+                                  p={p}
+                                  busy={rowBusy === p.slug}
+                                  onOpenGallery={setGallery}
+                                  onToggleInStock={toggleInStock}
+                                  onToggleActive={toggleActive}
+                                  onEdit={openEdit}
+                                  onDelete={async (product) => {
+                                    const ok = await confirm({
+                                      title: 'حذف محصول',
+                                      description: `آیا از حذف «${product.name}» مطمئن هستید؟ در سفارش‌های قبلی نام محصول حفظ می‌شود.`,
+                                      confirmLabel: 'حذف محصول',
+                                    })
+                                    if (!ok) return
+                                    await adminApi.products.remove(product.slug)
+                                    await loadGroup(group.key, page)
+                                    loadMeta({ soft: true })
+                                  }}
+                                />
+                              ))}
+                            </AdminTable>
+                            {totalPages > 1 && (
+                              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-mist-100 bg-mist-50/40 px-4 py-3 sm:px-5">
+                                <p className="text-[11px] text-ink-700/45">
+                                  نمایش {faDigits(items.length)} از {faDigits(total)} محصول
+                                </p>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-mist-200 bg-white text-ink-700/60 transition hover:border-copper-400/40 hover:text-copper-600 disabled:cursor-not-allowed disabled:opacity-35"
+                                    disabled={page <= 1 || groupLoading}
+                                    onClick={() => loadGroup(group.key, page - 1)}
+                                    aria-label="صفحه قبل"
+                                  >
+                                    <ChevronRight className="h-4 w-4" strokeWidth={2} />
+                                  </button>
+                                  <span className="min-w-[5.5rem] rounded-xl bg-white px-3 py-2 text-center text-xs font-bold tabular-nums text-ink-800 ring-1 ring-mist-200">
+                                    {faDigits(page)} / {faDigits(totalPages)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl border border-mist-200 bg-white text-ink-700/60 transition hover:border-copper-400/40 hover:text-copper-600 disabled:cursor-not-allowed disabled:opacity-35"
+                                    disabled={page >= totalPages || groupLoading}
+                                    onClick={() => loadGroup(group.key, page + 1)}
+                                    aria-label="صفحه بعد"
+                                  >
+                                    <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

@@ -7,7 +7,7 @@ import BrandLogo from '@/components/common/BrandLogo'
 import { isPriceOnRequest } from '@/utils/pricing'
 import PriceOnRequestNotice from '@/components/shop/PriceOnRequestNotice'
 
-export function ProductCard({ product, index = 0 }) {
+export function ProductCard({ product }) {
   const add = useCartStore((s) => s.add)
   const onRequest = isPriceOnRequest(product)
   const displayPrice = product.min_price ?? product.price_toman
@@ -20,8 +20,7 @@ export function ProductCard({ product, index = 0 }) {
 
   return (
     <article
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-mist-200/80 bg-white shadow-soft transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_rgba(15,23,42,0.14)] reveal"
-      style={{ transitionDelay: `${Math.min(index, 8) * 60}ms` }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-mist-200/80 bg-white shadow-soft transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_rgba(15,23,42,0.14)]"
     >
       <Link
         to={`/products/${product.slug}`}

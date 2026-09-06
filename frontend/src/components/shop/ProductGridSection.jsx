@@ -31,11 +31,11 @@ export default function ProductGridSection({
           </Link>
         )}
       </Reveal>
-      <Reveal className="reveal-scope grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {products.map((p, i) => (
-          <ProductCard key={p.id} product={p} index={i} />
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} />
         ))}
-      </Reveal>
+      </div>
     </section>
   )
 }

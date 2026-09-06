@@ -371,11 +371,11 @@ export default function ProductsPage() {
           </div>
         ) : items.length ? (
           <>
-            <Reveal className="reveal-scope grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {items.map((p, i) => (
-                <ProductCard key={p.id} product={p} index={i} />
+                <ProductCard key={p.id} product={p} />
               ))}
-            </Reveal>
+            </div>
             {totalPages > 1 && (
               <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
                 <button
