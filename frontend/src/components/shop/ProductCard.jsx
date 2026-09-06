@@ -20,7 +20,7 @@ export function ProductCard({ product }) {
 
   return (
     <article
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-mist-200/80 bg-white shadow-soft transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_rgba(15,23,42,0.14)]"
+      className="group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-mist-200/80 bg-white shadow-soft transition duration-300 hover:-translate-y-1.5 hover:shadow-[0_24px_50px_rgba(15,23,42,0.14)]"
     >
       <Link
         to={`/products/${product.slug}`}
@@ -34,8 +34,8 @@ export function ProductCard({ product }) {
             className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-            <span className="font-display text-3xl font-bold text-white/90">
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-4 text-center sm:p-6">
+            <span className="font-display text-2xl font-bold text-white/90 sm:text-3xl">
               {product.name?.slice(0, 1)}
             </span>
             <BrandLogo size="xs" accentClass="text-white/50" restClass="text-white/50" />
@@ -46,33 +46,33 @@ export function ProductCard({ product }) {
           aria-hidden
         />
         {discount > 0 && (
-          <span className="absolute right-3 top-3 rounded-lg bg-copper-500 px-2 py-1 text-xs font-bold text-white">
+          <span className="absolute right-2 top-2 rounded-lg bg-copper-500 px-1.5 py-0.5 text-[10px] font-bold text-white sm:right-3 sm:top-3 sm:px-2 sm:py-1 sm:text-xs">
             ٪{discount}-
           </span>
         )}
         {product.is_featured && (
-          <span className="absolute left-3 top-3 rounded-lg bg-white/15 px-2 py-1 text-[11px] font-medium text-white backdrop-blur">
+          <span className="absolute left-2 top-2 rounded-lg bg-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur sm:left-3 sm:top-3 sm:px-2 sm:py-1 sm:text-[11px]">
             ویژه
           </span>
         )}
         {onRequest && (
-          <span className="absolute bottom-3 right-3 rounded-lg bg-ink-950/75 px-2 py-1 text-[10px] font-semibold text-copper-400 backdrop-blur">
+          <span className="absolute bottom-2 right-2 rounded-lg bg-ink-950/75 px-1.5 py-0.5 text-[9px] font-semibold text-copper-400 backdrop-blur sm:bottom-3 sm:right-3 sm:px-2 sm:py-1 sm:text-[10px]">
             قیمت با تماس
           </span>
         )}
       </Link>
 
-      <div className="flex flex-1 flex-col p-4">
-        <div className="text-[11px] font-medium tracking-wide text-sea-600">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-4">
+        <div className="truncate text-[10px] font-medium tracking-wide text-sea-600 sm:text-[11px]">
           {product.category_name || product.brand || 'گجت'}
         </div>
         <Link to={`/products/${product.slug}`}>
-          <h3 className="mt-1 line-clamp-2 font-display text-base font-bold leading-7 text-ink-900 transition group-hover:text-copper-600">
+          <h3 className="mt-0.5 line-clamp-2 font-display text-sm font-bold leading-6 text-ink-900 transition group-hover:text-copper-600 sm:mt-1 sm:text-base sm:leading-7">
             {product.name}
           </h3>
         </Link>
         {product.short_description && (
-          <p className="mt-1 line-clamp-2 text-xs leading-6 text-ink-700/55">
+          <p className="mt-1 hidden line-clamp-2 text-xs leading-6 text-ink-700/55 sm:block">
             {product.short_description}
           </p>
         )}
@@ -93,13 +93,13 @@ export function ProductCard({ product }) {
           </div>
         )}
 
-        <div className="mt-auto pt-4">
+        <div className="mt-auto pt-2.5 sm:pt-4">
           {onRequest ? (
             <PriceOnRequestNotice variant="card" />
           ) : (
-            <div className="flex items-end justify-between gap-2">
-              <div>
-                <div className="font-bold text-copper-600">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <div className="truncate text-xs font-bold text-copper-600 sm:text-sm">
                   {product.has_options &&
                   product.min_price != null &&
                   product.min_price !== product.price_toman
@@ -107,7 +107,7 @@ export function ProductCard({ product }) {
                     : toman(displayPrice)}
                 </div>
                 {discount > 0 && (
-                  <div className="text-xs text-ink-700/35 line-through">
+                  <div className="text-[10px] text-ink-700/35 line-through sm:text-xs">
                     {toman(product.compare_at_price_toman)}
                   </div>
                 )}
@@ -115,7 +115,7 @@ export function ProductCard({ product }) {
               {product.has_options ? (
                 <Link
                   to={`/products/${product.slug}`}
-                  className="cursor-pointer rounded-xl bg-ink-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-copper-500"
+                  className="cursor-pointer rounded-lg bg-ink-950 px-2.5 py-1.5 text-center text-[11px] font-semibold text-white transition hover:bg-copper-500 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs"
                 >
                   انتخاب
                 </Link>
@@ -127,7 +127,7 @@ export function ProductCard({ product }) {
                     e.preventDefault()
                     add(product, 1)
                   }}
-                  className="cursor-pointer rounded-xl bg-ink-950 px-3 py-2 text-xs font-semibold text-white transition hover:bg-copper-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="cursor-pointer rounded-lg bg-ink-950 px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-copper-500 disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs"
                   aria-label={`افزودن ${product.name} به سبد`}
                 >
                   {product.in_stock ? 'افزودن' : 'ناموجود'}
