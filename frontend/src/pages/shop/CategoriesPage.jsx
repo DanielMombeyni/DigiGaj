@@ -290,7 +290,7 @@ export default function CategoriesPage() {
                       </Link>
 
                       {/* Subcategories — equal visual grid */}
-                      {subs.length > 0 ? (
+                      {subs.length > 0 && (
                         <div>
                           <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
                             <h3 className="text-sm font-semibold text-ink-800">زیردسته‌ها</h3>
@@ -302,10 +302,6 @@ export default function CategoriesPage() {
                             ))}
                           </div>
                         </div>
-                      ) : (
-                        <p className="rounded-2xl border border-dashed border-mist-200 bg-white/60 px-4 py-5 text-center text-sm text-ink-700/45">
-                          برای این دسته هنوز زیردسته‌ای تعریف نشده است.
-                        </p>
                       )}
                     </div>
                   </Reveal>

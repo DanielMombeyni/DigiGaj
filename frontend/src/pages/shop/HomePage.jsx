@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Truck,
   CreditCard,
@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Search,
 } from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { ProductCard } from '@/components/shop/ProductCard'
@@ -16,6 +17,9 @@ import BrandLogo from '@/components/common/BrandLogo'
 import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { mediaSrc } from '@/utils/media'
+import { useDebounce } from '@/hooks/useDebounce'
+import { toman } from '@/utils/format'
+import { isPriceOnRequest } from '@/utils/pricing'
 
 const BENEFITS = [
   {
@@ -46,6 +50,155 @@ const STEPS = [
   { n: '۰۳', t: 'پرداخت امن', d: 'درگاه آنلاین یا کارت‌به‌کارت' },
   { n: '۰۴', t: 'دریافت سریع', d: 'پیگیری سفارش تا لحظه تحویل' },
 ]
+
+function HomeSearchBar() {
+  const navigate = useNavigate()
+  const wrapRef = useRef(null)
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [results, setResults] = useState([])
+  const debouncedQ = useDebounce(q, 300)
+
+  useEffect(() => {
+    const term = debouncedQ.trim()
+    if (term.length < 2) {
+      setResults([])
+      setLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    setLoading(true)
+    shopApi
+      .products({ search: term, page_size: 6 })
+      .then((r) => {
+        if (cancelled) return
+        const list = r.data?.results || r.data || []
+        setResults(Array.isArray(list) ? list : [])
+        setOpen(true)
+      })
+      .catch(() => {
+        if (!cancelled) setResults([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQ])
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  const goSearch = (e) => {
+    e?.preventDefault?.()
+    const term = q.trim()
+    if (!term) return
+    setOpen(false)
+    navigate(`/products?search=${encodeURIComponent(term)}`)
+  }
+
+  const goProduct = (slug) => {
+    setOpen(false)
+    navigate(`/products/${slug}`)
+  }
+
+  const showPanel = open && q.trim().length >= 2
+
+  return (
+    <form ref={wrapRef} onSubmit={goSearch} className="relative mt-8 max-w-lg">
+      <div className="flex overflow-hidden rounded-2xl border border-white/15 bg-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md focus-within:border-copper-400/50">
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => q.trim().length >= 2 && setOpen(true)}
+          placeholder="جستجوی محصول، برند یا مدل..."
+          className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/40"
+          autoComplete="off"
+          aria-label="جستجوی محصول"
+          aria-expanded={showPanel}
+          aria-controls="home-search-results"
+        />
+        <button
+          type="submit"
+          className="inline-flex cursor-pointer items-center gap-2 bg-copper-500 px-4 text-sm font-semibold text-white transition hover:bg-copper-600 sm:px-5"
+        >
+          <Search className="h-4 w-4" strokeWidth={2} />
+          <span className="hidden sm:inline">جستجو</span>
+        </button>
+      </div>
+
+      {showPanel && (
+        <div
+          id="home-search-results"
+          role="listbox"
+          className="absolute inset-x-0 top-[calc(100%+0.5rem)] z-30 overflow-hidden rounded-2xl border border-mist-200 bg-white text-ink-900 shadow-[0_20px_50px_rgba(15,23,42,0.28)]"
+        >
+          {loading ? (
+            <p className="px-4 py-3 text-sm text-ink-700/50">در حال جستجو...</p>
+          ) : results.length ? (
+            <ul className="max-h-72 overflow-y-auto py-1">
+              {results.map((p) => {
+                const onRequest = isPriceOnRequest(p)
+                const price = p.min_price ?? p.price_toman
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      onClick={() => goProduct(p.slug)}
+                      className="flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-start transition hover:bg-mist-50"
+                    >
+                      <span className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-mist-100">
+                        {p.primary_image ? (
+                          <img
+                            src={mediaSrc(p.primary_image)}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span className="flex h-full items-center justify-center text-xs font-bold text-ink-700/30">
+                            {p.name?.slice(0, 1)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-ink-900">{p.name}</span>
+                        <span className="mt-0.5 block text-xs text-copper-600">
+                          {onRequest ? 'قیمت با تماس' : toman(price)}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <p className="px-4 py-3 text-sm text-ink-700/50">محصولی پیدا نشد — جستجو را بزنید تا در کاتالوگ ببینید.</p>
+          )}
+          <button
+            type="submit"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 border-t border-mist-100 bg-mist-50/80 px-4 py-2.5 text-xs font-semibold text-sea-600 transition hover:bg-mist-100 hover:text-copper-600"
+          >
+            <Search className="h-3.5 w-3.5" strokeWidth={2} />
+            جستجو برای «{q.trim()}» در همه محصولات
+          </button>
+        </div>
+      )}
+    </form>
+  )
+}
 
 function SkeletonGrid() {
   return (
@@ -270,7 +423,8 @@ export default function HomePage() {
             <p className="mt-4 max-w-md text-sm leading-7 text-white/60 md:text-base md:leading-8">
               از هدفون و ساعت هوشمند تا لوازم گیمینگ — خرید امن، ارسال سریع، پشتیبانی واقعی.
             </p>
-            <div className="mt-9 flex flex-wrap gap-3">
+            <HomeSearchBar />
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link to="/products" className="btn-primary min-h-11 cursor-pointer px-7">
                 مشاهده محصولات
               </Link>
