@@ -67,7 +67,7 @@ from app.services.staff_access import user_has_admin_page
 from app.services.order_service import OrderService
 from app.services.payment_service import PaymentService
 from app.payment.utils import detect_platform
-from app.filters import ProductFilter
+from app.filters import ProductFilter, ProductOrderingFilter
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -109,7 +109,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     required_admin_page = "products"
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     lookup_field = "slug"
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, ProductOrderingFilter]
     filterset_class = ProductFilter
     search_fields = ["name", "brand", "short_description"]
     ordering_fields = ["price_toman", "created_at", "name"]

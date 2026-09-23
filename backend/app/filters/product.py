@@ -1,4 +1,6 @@
 import django_filters
+from django.db.models import Case, IntegerField, Q, Value, When
+from rest_framework.filters import OrderingFilter
 
 from app.models import Category, Product
 
@@ -16,6 +18,36 @@ def category_with_descendants(category_id: int) -> list[int]:
         if len(ids) > 500:
             break
     return ids
+
+
+class ProductOrderingFilter(OrderingFilter):
+    """
+    When sorting by price, push products without a fixed price
+    (price_on_request or price_toman <= 0) to the end of the list.
+    """
+
+    def filter_queryset(self, request, queryset, view):
+        ordering = self.get_ordering(request, queryset, view)
+        if not ordering:
+            return queryset
+
+        needs_noprice_last = any(f in ("price_toman", "-price_toman") for f in ordering)
+        if not needs_noprice_last:
+            return queryset.order_by(*ordering)
+
+        queryset = queryset.annotate(
+            _noprice=Case(
+                When(Q(price_on_request=True) | Q(price_toman__lte=0), then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
+        final = []
+        for field in ordering:
+            if field in ("price_toman", "-price_toman"):
+                final.append("_noprice")
+            final.append(field)
+        return queryset.order_by(*final)
 
 
 class ProductFilter(django_filters.FilterSet):
