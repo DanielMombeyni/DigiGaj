@@ -6,7 +6,6 @@ import { useAuthStore } from '@/store/auth'
 import { getStorefrontConfig, subscribeStorefrontConfig } from '@/services/storefrontConfig'
 import { faDigits } from '@/utils/format'
 import { isPageEnabled } from '@/config/publicPages'
-import SiteBranding from '@/components/shop/SiteBranding'
 import BrandLogo from '@/components/common/BrandLogo'
 import { brand } from '@/config/brand'
 
@@ -73,7 +72,6 @@ export default function ShopLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteBranding />
       <header
         className={`sticky top-0 z-50 text-white transition duration-300 ${
           scrolled

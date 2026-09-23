@@ -8,6 +8,10 @@ import { PANEL_BASE } from '@/config/panel'
 export default function AdminDashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [percent, setPercent] = useState('')
+  const [priceBusy, setPriceBusy] = useState(false)
+  const [priceMsg, setPriceMsg] = useState('')
+  const [priceErr, setPriceErr] = useState('')
 
   useEffect(() => {
     adminApi
@@ -40,6 +44,29 @@ export default function AdminDashboard() {
       hint: 'نیاز به پاسخ پشتیبانی',
     },
   ]
+
+  const applyBulkPrice = async (e) => {
+    e.preventDefault()
+    setPriceMsg('')
+    setPriceErr('')
+    const n = Number(String(percent).replace(/[^\d.-]/g, ''))
+    if (!Number.isFinite(n) || n === 0) {
+      setPriceErr('یک درصد غیرصفر وارد کنید (مثلاً ۱۰ یا ۵-)')
+      return
+    }
+    setPriceBusy(true)
+    try {
+      const { data: res } = await adminApi.products.bulkPriceAdjust(n)
+      setPriceMsg(
+        `اعمال شد: ${faDigits(res.updated_products || 0)} محصول و ${faDigits(res.updated_variants || 0)} تنوع`,
+      )
+      setPercent('')
+    } catch (err) {
+      setPriceErr(err.response?.data?.detail || err.message || 'خطا در اعمال درصد')
+    } finally {
+      setPriceBusy(false)
+    }
+  }
 
   return (
     <div className="animate-rise">
@@ -77,6 +104,37 @@ export default function AdminDashboard() {
           ))}
         </div>
       )}
+
+      <AdminCard title="تغییر گروهی قیمت‌ها" className="mt-8">
+        <p className="text-sm leading-7 text-ink-700/65">
+          درصد را وارد کنید تا به قیمت همه محصولاتی که قیمت ثابت دارند اضافه یا از آن‌ها کم شود.
+          محصولات «قیمت با تماس» تغییر نمی‌کنند.
+        </p>
+        <form onSubmit={applyBulkPrice} className="mt-4 flex flex-wrap items-end gap-3">
+          <label className="block min-w-[10rem] flex-1">
+            <span className="label">درصد تغییر</span>
+            <input
+              className="input"
+              type="number"
+              step="any"
+              name="percent"
+              value={percent}
+              onChange={(e) => setPercent(e.target.value)}
+              placeholder="مثلاً ۱۰ یا ۵-"
+              disabled={priceBusy}
+            />
+          </label>
+          <button
+            type="submit"
+            className="btn-primary min-h-11 cursor-pointer px-6 disabled:opacity-50"
+            disabled={priceBusy}
+          >
+            {priceBusy ? 'در حال اعمال...' : 'اعمال'}
+          </button>
+        </form>
+        {priceMsg ? <p className="mt-3 text-sm text-emerald-700">{priceMsg}</p> : null}
+        {priceErr ? <p className="mt-3 text-sm text-red-600">{priceErr}</p> : null}
+      </AdminCard>
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2">
         <AdminCard title="میانبرهای سریع">

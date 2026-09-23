@@ -62,6 +62,7 @@ export const adminApi = {
   products: {
     list: (params) => api.get('/products/', { params }),
     categoryCounts: () => api.get('/products/category-counts/'),
+    bulkPriceAdjust: (percent) => api.post('/products/bulk-price-adjust/', { percent }),
     get: (slug) => api.get(`/products/${slug}/`),
     create: (data) => api.post('/products/', data),
     update: (slug, data) => api.patch(`/products/${slug}/`, data),

@@ -44,8 +44,7 @@ function parsePriceParam(value, fallback) {
 }
 
 function filtersDefaultOpen() {
-  if (typeof window === 'undefined') return true
-  return window.matchMedia('(min-width: 768px)').matches
+  return false
 }
 
 export default function ProductsPage() {
