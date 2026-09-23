@@ -12,6 +12,7 @@ include(
     "components/celery.py",
     "components/channels.py",
     "components/payment.py",
+    "components/sms.py",
     f"environments/{ENV}.py",
     optional("local_settings.py"),
 )
