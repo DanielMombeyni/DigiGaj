@@ -10,7 +10,7 @@ export function isPriceOnRequest(productOrItem) {
   if (!productOrItem) return false
   if (productOrItem.price_on_request === true) return true
   if (productOrItem.price_pending === true) return true
-  const price = productOrItem.price_toman
+  const price = productOrItem.min_price ?? productOrItem.price_toman
   if (price === 0 || price === '0') return true
   return false
 }

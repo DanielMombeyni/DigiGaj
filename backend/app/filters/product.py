@@ -26,28 +26,27 @@ class ProductOrderingFilter(OrderingFilter):
     (price_on_request or price_toman <= 0) to the end of the list.
     """
 
+    @staticmethod
+    def noprice_expression():
+        return Case(
+            When(Q(price_on_request=True) | Q(price_toman__lte=0), then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+
     def filter_queryset(self, request, queryset, view):
         ordering = self.get_ordering(request, queryset, view)
         if not ordering:
             return queryset
 
-        needs_noprice_last = any(f in ("price_toman", "-price_toman") for f in ordering)
-        if not needs_noprice_last:
-            return queryset.order_by(*ordering)
-
-        queryset = queryset.annotate(
-            _noprice=Case(
-                When(Q(price_on_request=True) | Q(price_toman__lte=0), then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField(),
-            )
-        )
-        final = []
+        noprice = self.noprice_expression()
+        parts = []
         for field in ordering:
             if field in ("price_toman", "-price_toman"):
-                final.append("_noprice")
-            final.append(field)
-        return queryset.order_by(*final)
+                parts.append(noprice)
+            parts.append(field)
+        parts.append("id")
+        return queryset.order_by(*parts)
 
 
 class ProductFilter(django_filters.FilterSet):
