@@ -15,6 +15,7 @@ from .site_content import SitePage, Banner, SiteSetting
 from .profile import UserProfile
 from .customer_address import CustomerAddress, MAX_CUSTOMER_ADDRESSES
 from .sms_provider import SmsProviderConfig
+from .sms_template import SmsTemplate
 from .staff import StaffRole
 from .support import SupportTicket, TicketMessage
 from .email import EmailTemplate
@@ -40,6 +41,7 @@ __all__ = [
     "CustomerAddress",
     "MAX_CUSTOMER_ADDRESSES",
     "SmsProviderConfig",
+    "SmsTemplate",
     "StaffRole",
     "SupportTicket",
     "TicketMessage",

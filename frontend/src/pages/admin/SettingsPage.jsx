@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { KeyRound, Building2, ShieldCheck, MessageSquare, Mail } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { useConfirm } from '@/components/common/ConfirmProvider'
@@ -100,7 +100,11 @@ function CredentialFields({ schema, creds, setCreds }) {
 
 export default function AdminSettingsPage() {
   const confirm = useConfirm()
-  const [tab, setTab] = useState('auth')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = TABS.some((t) => t.id === searchParams.get('tab'))
+    ? searchParams.get('tab')
+    : 'auth'
+  const [tab, setTab] = useState(initialTab)
   const [form, setForm] = useState(empty)
   const [smsAvailable, setSmsAvailable] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -118,6 +122,9 @@ export default function AdminSettingsPage() {
   const [smsCreds, setSmsCreds] = useState({})
   const [smsName, setSmsName] = useState('')
   const [smsBusy, setSmsBusy] = useState(false)
+  const [smsTestPhone, setSmsTestPhone] = useState('')
+  const [smsTestBusy, setSmsTestBusy] = useState(false)
+  const [smsTestProviderId, setSmsTestProviderId] = useState('')
   const [smtp, setSmtp] = useState(emptySmtp)
   const [smtpLoading, setSmtpLoading] = useState(false)
   const [testTo, setTestTo] = useState('')
@@ -127,6 +134,8 @@ export default function AdminSettingsPage() {
     () => smsCatalog.filter((d) => !d.already_added),
     [smsCatalog],
   )
+
+  const readySmsRows = useMemo(() => smsRows.filter((r) => r.is_ready), [smsRows])
 
   const selectedSmsDriver = useMemo(() => {
     if (smsMode === 'edit' && editingSms) {
@@ -181,10 +190,33 @@ export default function AdminSettingsPage() {
       ])
       setSmsRows(listRes.data || [])
       setSmsCatalog(catRes.data?.drivers || [])
+      const list = listRes.data || []
+      const preferred =
+        list.find((r) => r.is_enabled && r.is_ready) || list.find((r) => r.is_ready) || list[0]
+      setSmsTestProviderId((prev) => {
+        if (prev && list.some((r) => String(r.id) === String(prev))) return prev
+        return preferred ? String(preferred.id) : ''
+      })
     } catch {
       setSmsError('خطا در بارگذاری سرویس‌های پیامک')
     } finally {
       setSmsLoading(false)
+    }
+  }
+
+  const sendSmsProviderTest = async () => {
+    const phone = smsTestPhone.trim()
+    if (!phone || !smsTestProviderId) return
+    setSmsTestBusy(true)
+    setSmsError('')
+    setOk('')
+    try {
+      const r = await adminApi.smsProviders.test(smsTestProviderId, phone)
+      setOk(r.data?.detail || 'پیامک آزمایشی ارسال شد.')
+    } catch (err) {
+      setSmsError(err.response?.data?.detail || 'ارسال آزمایشی ناموفق بود')
+    } finally {
+      setSmsTestBusy(false)
     }
   }
 
@@ -255,6 +287,17 @@ export default function AdminSettingsPage() {
     if (tab === 'email') loadSmtp()
   }, [tab])
 
+  const selectTab = (id) => {
+    setTab(id)
+    setError('')
+    setOk('')
+    setSmsError('')
+    const next = new URLSearchParams(searchParams)
+    if (id === 'auth') next.delete('tab')
+    else next.set('tab', id)
+    setSearchParams(next, { replace: true })
+  }
+
   const activeCount = useMemo(
     () => Object.values(form.auth_methods || {}).filter(Boolean).length,
     [form.auth_methods],
@@ -283,7 +326,7 @@ export default function AdminSettingsPage() {
     setOk('')
     if (activeCount < 1) {
       setError('حداقل یک روش ورود باید فعال باشد.')
-      setTab('auth')
+      selectTab('auth')
       return
     }
     setSaving(true)
@@ -447,12 +490,7 @@ export default function AdminSettingsPage() {
             <button
               key={t.id}
               type="button"
-              onClick={() => {
-                setTab(t.id)
-                setError('')
-                setOk('')
-                setSmsError('')
-              }}
+              onClick={() => selectTab(t.id)}
               className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium transition ${
                 active
                   ? 'bg-ink-950 text-white'
@@ -611,10 +649,15 @@ export default function AdminSettingsPage() {
           </form>
         )
       ) : tab === 'sms' ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-700/55">
               سرویس را اضافه کنید، از جدول فعال/غیرفعال کنید. فقط یک سرویس می‌تواند همزمان فعال باشد.
+              برای ارسال و قالب‌ها به صفحه{' '}
+              <Link to={`${PANEL_BASE}/sms`} className="font-medium text-copper-700 underline underline-offset-2">
+                پیامک
+              </Link>{' '}
+              بروید.
             </p>
             <button
               type="button"
@@ -663,6 +706,22 @@ export default function AdminSettingsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        title="تست این سرویس"
+                        aria-label="تست این سرویس"
+                        disabled={!row.is_ready || smsTestBusy}
+                        onClick={() => {
+                          setSmsTestProviderId(String(row.id))
+                          setSmsError('')
+                          setOk('')
+                          const el = document.getElementById('sms-provider-test')
+                          el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                        }}
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-copper-600 transition hover:bg-copper-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <MessageSquare className="h-4 w-4" strokeWidth={1.85} />
+                      </button>
                       <AdminEditButton onClick={() => openSmsEdit(row)} />
                       <AdminDeleteButton onClick={() => removeSms(row)} />
                     </div>
@@ -671,6 +730,65 @@ export default function AdminSettingsPage() {
               ))}
             </AdminTable>
           )}
+
+          <div
+            id="sms-provider-test"
+            className="rounded-2xl border border-mist-200/80 bg-surface p-4 shadow-soft sm:p-5"
+          >
+            <p className="mb-1 text-sm font-medium text-ink-900">ارسال آزمایشی سرویس</p>
+            <p className="mb-3 text-xs text-ink-700/45">
+              برای سیگنال یک پیام متنی کوتاه ارسال می‌شود؛ برای SMS.ir و فراپیامک کد آزمایشی OTP
+              (۱۲۳۴۵۶) مطابق قالب تنظیم‌شده فرستاده می‌شود.
+            </p>
+            {!readySmsRows.length ? (
+              <p className="text-sm text-amber-700">
+                ابتدا یک سرویس اضافه کنید و اطلاعات آن را کامل کنید تا آماده شود.
+              </p>
+            ) : (
+              <div className="flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
+                <label className="block min-w-0 flex-1">
+                  <span className="label">سرویس</span>
+                  <select
+                    className="input"
+                    value={smsTestProviderId}
+                    onChange={(e) => setSmsTestProviderId(e.target.value)}
+                  >
+                    {smsRows.map((row) => (
+                      <option key={row.id} value={row.id} disabled={!row.is_ready}>
+                        {row.display_name || row.label}
+                        {row.is_enabled ? ' (فعال)' : ''}
+                        {!row.is_ready ? ' — ناقص' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block min-w-0 flex-1">
+                  <span className="label">شماره موبایل</span>
+                  <input
+                    className="input"
+                    dir="ltr"
+                    value={smsTestPhone}
+                    onChange={(e) => setSmsTestPhone(e.target.value)}
+                    placeholder="0912xxxxxxx"
+                    autoComplete="tel"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-dark cursor-pointer shrink-0"
+                  disabled={
+                    smsTestBusy ||
+                    !smsTestPhone.trim() ||
+                    !smsTestProviderId ||
+                    !readySmsRows.some((r) => String(r.id) === String(smsTestProviderId))
+                  }
+                  onClick={sendSmsProviderTest}
+                >
+                  {smsTestBusy ? 'در حال ارسال...' : 'ارسال آزمایشی'}
+                </button>
+              </div>
+            )}
+          </div>
 
           <AdminModal
             open={!!smsMode}

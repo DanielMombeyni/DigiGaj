@@ -184,3 +184,40 @@ class SmsProviderService:
                 return False, str(exc)
             logger.exception("SMS send failed via %s", cfg.provider_type)
             return False, "خطا در ارسال پیامک"
+
+    @classmethod
+    def test_send(cls, cfg: SmsProviderConfig, phone: str) -> tuple[bool, str | None]:
+        """Send a one-off test SMS/OTP through a configured provider."""
+        phone = (phone or "").strip()
+        if not phone:
+            return False, "شماره موبایل الزامی است."
+        driver = get_driver(cfg.provider_type)
+        if not driver:
+            return False, "درایور پیامک یافت نشد."
+        if not driver.is_ready(cfg.credentials or {}):
+            return False, "تنظیمات سرویس پیامک ناقص است. ابتدا اطلاعات را کامل کنید."
+        try:
+            if cfg.provider_type == "signal":
+                from app.sms.drivers.signal import SignalSmsDriver
+                from app.sms.signal.exceptions import SignalSmsError
+
+                try:
+                    client = SignalSmsDriver._client(cfg.credentials or {})
+                    client.send_sms(phone, "پیامک آزمایشی از پنل مدیریت فروشگاه")
+                    return True, None
+                except SignalSmsError as exc:
+                    logger.error("SMS provider test failed via signal: %s", exc)
+                    return False, str(exc)
+
+            return driver.send_otp(
+                phone=phone, code="123456", creds=cfg.credentials or {}
+            )
+        except Exception as exc:
+            from app.sms.signal.exceptions import SignalSmsError
+
+            if isinstance(exc, SignalSmsError):
+                logger.error("SMS provider test failed via %s: %s", cfg.provider_type, exc)
+                return False, str(exc)
+            logger.exception("SMS provider test failed via %s", cfg.provider_type)
+            return False, "ارسال آزمایشی ناموفق بود."
+

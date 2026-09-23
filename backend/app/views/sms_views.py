@@ -66,3 +66,27 @@ class AdminSmsProviderDetailView(APIView):
             return Response({"detail": "یافت نشد"}, status=404)
         SmsProviderService.delete(cfg)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminSmsProviderTestView(APIView):
+    """Send a test SMS/OTP through a configured provider (settings tab)."""
+
+    permission_classes = [HasAdminPage]
+    required_admin_page = "settings"
+
+    def post(self, request, pk):
+        try:
+            cfg = SmsProviderConfig.objects.get(pk=pk)
+        except SmsProviderConfig.DoesNotExist:
+            return Response({"detail": "یافت نشد"}, status=404)
+        phone = (request.data.get("phone") or request.data.get("to") or "").strip()
+        ok, err = SmsProviderService.test_send(cfg, phone)
+        if not ok:
+            return Response({"detail": err or "ارسال آزمایشی ناموفق بود."}, status=400)
+        return Response(
+            {
+                "detail": "پیامک آزمایشی ارسال شد.",
+                "provider_type": cfg.provider_type,
+                "display_name": cfg.display_name,
+            }
+        )

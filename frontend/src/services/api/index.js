@@ -137,6 +137,19 @@ export const adminApi = {
     create: (data) => api.post('/admin/sms-providers/', data),
     update: (id, data) => api.patch(`/admin/sms-providers/${id}/`, data),
     remove: (id) => api.delete(`/admin/sms-providers/${id}/`),
+    test: (id, phone) => api.post(`/admin/sms-providers/${id}/test/`, { phone }),
+  },
+  sms: {
+    catalog: () => api.get('/admin/sms/catalog/'),
+    balance: () => api.get('/admin/sms/balance/'),
+    send: (data) => api.post('/admin/sms/send/', data),
+  },
+  smsTemplates: {
+    list: () => api.get('/admin/sms-templates/'),
+    create: (data) => api.post('/admin/sms-templates/', data),
+    update: (id, data) => api.patch(`/admin/sms-templates/${id}/`, data),
+    remove: (id) => api.delete(`/admin/sms-templates/${id}/`),
+    test: (id, data) => api.post(`/admin/sms-templates/${id}/test/`, data),
   },
   personnel: {
     list: (params) => api.get('/admin/personnel/', { params }),

@@ -16,6 +16,7 @@ import {
   Menu,
   Store,
   Mail,
+  MessageSquare,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
 import Seo from '@/components/common/Seo'
@@ -96,6 +97,12 @@ const links = [
     icon: <Mail className={iconCls} strokeWidth={1.75} />,
   },
   {
+    page: 'sms',
+    to: `${PANEL_BASE}/sms`,
+    label: 'پیامک',
+    icon: <MessageSquare className={iconCls} strokeWidth={1.75} />,
+  },
+  {
     page: 'customers',
     to: `${PANEL_BASE}/customers`,
     label: 'مشتریان',
@@ -127,6 +134,7 @@ const titles = {
   [`${PANEL_BASE}/tickets`]: 'تیکت‌ها و پشتیبانی',
   [`${PANEL_BASE}/storefront`]: 'صفحات فروشگاه',
   [`${PANEL_BASE}/emails`]: 'ایمیل‌ها',
+  [`${PANEL_BASE}/sms`]: 'پیامک',
   [`${PANEL_BASE}/customers`]: 'مشتریان',
   [`${PANEL_BASE}/personnel`]: 'پرسنل و نقش‌ها',
   [`${PANEL_BASE}/settings`]: 'تنظیمات فروشگاه',
