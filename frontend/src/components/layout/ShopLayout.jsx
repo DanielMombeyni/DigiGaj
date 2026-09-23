@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { ShoppingCart, Menu, X, UserRound } from 'lucide-react'
 import { useCartStore } from '@/store/cart'
 import { useAuthStore } from '@/store/auth'
@@ -19,6 +19,8 @@ const nav = [
 ]
 
 export default function ShopLayout() {
+  const location = useLocation()
+  const isHome = location.pathname === '/'
   const items = useCartStore((s) => s.items)
   const user = useAuthStore((s) => s.user)
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -74,6 +76,7 @@ export default function ShopLayout() {
   return (
     <div className="flex min-h-screen flex-col">
       <SiteBranding />
+      {!isHome ? (
       <header
         className={`sticky top-0 z-50 text-white transition duration-300 ${
           scrolled
@@ -216,6 +219,7 @@ export default function ShopLayout() {
           </nav>
         </div>
       </header>
+      ) : null}
 
       <main className="flex-1">
         <Outlet />

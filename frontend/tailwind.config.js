@@ -27,10 +27,15 @@ export default {
           600: 'rgb(var(--color-sea-600-rgb) / <alpha-value>)',
         },
         surface: 'rgb(var(--color-surface-rgb) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
+        'hero-bg': 'hsl(var(--hero-bg) / <alpha-value>)',
+        'hero-sub': 'hsl(var(--hero-sub) / <alpha-value>)',
       },
       fontFamily: {
         display: ['"Vazirmatn"', '"IBM Plex Sans Arabic"', 'Tahoma', 'sans-serif'],
         body: ['"Vazirmatn"', 'Tahoma', 'sans-serif'],
+        geist: ['"Geist Sans"', 'Geist', 'system-ui', 'sans-serif'],
+        general: ['"General Sans"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 18px 40px rgba(15, 23, 42, 0.12)',
@@ -68,6 +73,10 @@ export default {
           '0%, 100%': { transform: 'translate(-50%, 0)' },
           '50%': { transform: 'translate(-50%, 6px)' },
         },
+        'logo-marquee': {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         rise: 'rise 0.85s cubic-bezier(0.22, 1, 0.36, 1) both',
@@ -77,6 +86,7 @@ export default {
         'orb-slow': 'orb-slow 12s ease-in-out infinite',
         'pulse-soft': 'pulse-soft 4s ease-in-out infinite',
         'bounce-soft': 'bounce-soft 2.2s ease-in-out infinite',
+        'logo-marquee': 'logo-marquee 20s linear infinite',
       },
     },
   },

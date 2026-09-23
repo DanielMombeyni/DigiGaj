@@ -5,10 +5,10 @@ import {
   CreditCard,
   ShieldCheck,
   CircleHelp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Search,
+  ArrowUpLeft,
 } from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { ProductCard } from '@/components/shop/ProductCard'
@@ -18,37 +18,37 @@ import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { mediaSrc } from '@/utils/media'
 import { useDebounce } from '@/hooks/useDebounce'
-import { toman } from '@/utils/format'
+import { cn, faDigits, toman } from '@/utils/format'
 import { isPriceOnRequest } from '@/utils/pricing'
 
 const BENEFITS = [
   {
     title: 'ارسال سریع',
     text: 'ارسال به سراسر کشور با بسته‌بندی ایمن مخصوص گجت',
-    icon: <Truck className="h-6 w-6" strokeWidth={1.75} />,
+    icon: Truck,
   },
   {
     title: 'پرداخت امن',
     text: 'درگاه‌های معتبر و امکان کارت‌به‌کارت با تأیید ادمین',
-    icon: <CreditCard className="h-6 w-6" strokeWidth={1.75} />,
+    icon: CreditCard,
   },
   {
     title: 'گارانتی معتبر',
     text: 'محصولات با ضمانت اصالت و پشتیبانی واقعی',
-    icon: <ShieldCheck className="h-6 w-6" strokeWidth={1.75} />,
+    icon: ShieldCheck,
   },
   {
     title: 'مشاوره تخصصی',
     text: 'کمک برای انتخاب درست قبل از خرید',
-    icon: <CircleHelp className="h-6 w-6" strokeWidth={1.75} />,
+    icon: CircleHelp,
   },
 ]
 
 const STEPS = [
-  { n: '۰۱', t: 'انتخاب گجت', d: 'از میان دسته‌بندی‌ها و محصولات ویژه' },
-  { n: '۰۲', t: 'ثبت سفارش', d: 'آدرس و کد تخفیف را وارد کنید' },
-  { n: '۰۳', t: 'پرداخت امن', d: 'درگاه آنلاین یا کارت‌به‌کارت' },
-  { n: '۰۴', t: 'دریافت سریع', d: 'پیگیری سفارش تا لحظه تحویل' },
+  { t: 'انتخاب گجت', d: 'از میان دسته‌بندی‌ها و محصولات ویژه' },
+  { t: 'ثبت سفارش', d: 'آدرس و کد تخفیف را وارد کنید' },
+  { t: 'پرداخت امن', d: 'درگاه آنلاین یا کارت‌به‌کارت' },
+  { t: 'دریافت سریع', d: 'پیگیری سفارش تا لحظه تحویل' },
 ]
 
 function HomeSearchBar() {
@@ -112,7 +112,7 @@ function HomeSearchBar() {
   const showPanel = open && q.trim().length >= 2
 
   return (
-    <form ref={wrapRef} onSubmit={goSearch} className="relative mt-8 max-w-lg">
+    <form ref={wrapRef} onSubmit={goSearch} className="relative mt-7 max-w-lg">
       <div className="flex overflow-hidden rounded-2xl border border-white/15 bg-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md focus-within:border-copper-400/50">
         <input
           type="search"
@@ -131,14 +131,14 @@ function HomeSearchBar() {
         />
         <button
           type="submit"
-          className="inline-flex cursor-pointer items-center gap-2 bg-copper-500 px-4 text-sm font-semibold text-white transition hover:bg-copper-600 sm:px-5"
+          className="inline-flex cursor-pointer items-center gap-2 bg-copper-500 px-4 text-sm font-semibold text-white transition hover:bg-copper-600 active:scale-[0.98] sm:px-5"
         >
-          <Search className="h-4 w-4" strokeWidth={2} />
+          <Search className="h-4 w-4" strokeWidth={2} aria-hidden />
           <span className="hidden sm:inline">جستجو</span>
         </button>
       </div>
 
-      {showPanel && (
+      {showPanel ? (
         <div
           id="home-search-results"
           role="listbox"
@@ -185,27 +185,53 @@ function HomeSearchBar() {
               })}
             </ul>
           ) : (
-            <p className="px-4 py-3 text-sm text-ink-700/50">محصولی پیدا نشد — جستجو را بزنید تا در کاتالوگ ببینید.</p>
+            <p className="px-4 py-3 text-sm text-ink-700/50">
+              محصولی پیدا نشد. جستجو را بزنید تا در کاتالوگ ببینید.
+            </p>
           )}
           <button
             type="submit"
             className="flex w-full cursor-pointer items-center justify-center gap-2 border-t border-mist-100 bg-mist-50/80 px-4 py-2.5 text-xs font-semibold text-sea-600 transition hover:bg-mist-100 hover:text-copper-600"
           >
-            <Search className="h-3.5 w-3.5" strokeWidth={2} />
+            <Search className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
             جستجو برای «{q.trim()}» در همه محصولات
           </button>
         </div>
-      )}
+      ) : null}
     </form>
   )
 }
 
 function SkeletonGrid() {
   return (
-    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-72 animate-pulse rounded-2xl bg-mist-100" />
+        <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-mist-100" />
       ))}
+    </div>
+  )
+}
+
+function CategoryMedia({ category }) {
+  if (category.image) {
+    return (
+      <img
+        src={mediaSrc(category.image)}
+        alt=""
+        className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-[1.05] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+        loading="lazy"
+        draggable={false}
+      />
+    )
+  }
+  return (
+    <div
+      className="flex h-full w-full items-center justify-center bg-gradient-to-br from-ink-900 via-ink-800 to-sea-600/35"
+      aria-hidden
+    >
+      <span className="font-display text-3xl font-bold text-white/15 sm:text-4xl">
+        {category.name?.slice(0, 1)}
+      </span>
     </div>
   )
 }
@@ -219,7 +245,6 @@ function CategoryRail({ categories, loading }) {
     const el = scrollerRef.current
     if (!el) return
     const max = el.scrollWidth - el.clientWidth
-    // With dir=ltr: scrollLeft 0 = start (left), max = end (right)
     setCanPrev(el.scrollLeft > 4)
     setCanNext(el.scrollLeft < max - 4)
   }
@@ -250,18 +275,15 @@ function CategoryRail({ categories, loading }) {
   const scrollByDir = (dir) => {
     const el = scrollerRef.current
     if (!el) return
-    const amount = Math.min(280, el.clientWidth * 0.7) * dir
+    const amount = Math.min(320, el.clientWidth * 0.7) * dir
     el.scrollBy({ left: amount, behavior: 'smooth' })
   }
 
   if (loading) {
     return (
-      <div className="mt-8 flex gap-4 overflow-hidden px-1">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div key={i} className="flex w-[4.75rem] shrink-0 flex-col items-center gap-2.5">
-            <div className="h-[4.75rem] w-[4.75rem] animate-pulse rounded-full bg-white/10" />
-            <div className="h-2.5 w-12 animate-pulse rounded-full bg-white/10" />
-          </div>
+      <div className="mt-8 flex gap-3 overflow-hidden">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-36 w-40 shrink-0 animate-pulse rounded-2xl bg-white/10 sm:h-40 sm:w-44" />
         ))}
       </div>
     )
@@ -273,71 +295,53 @@ function CategoryRail({ categories, loading }) {
 
   return (
     <div className="relative mt-8">
-      <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-10 bg-gradient-to-r from-ink-950 to-transparent md:w-14"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-10 bg-gradient-to-l from-ink-950 to-transparent md:w-14"
-        aria-hidden
-      />
-
       <button
         type="button"
         onClick={() => scrollByDir(-1)}
         disabled={!canPrev}
         aria-label="دسته‌های قبلی"
-        className="absolute left-0 top-[1.85rem] z-[2] hidden h-9 w-9 -translate-x-1 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-ink-900/90 text-white shadow-lg backdrop-blur-sm transition hover:border-copper-400/50 hover:bg-ink-800 disabled:pointer-events-none disabled:opacity-0 md:inline-flex"
+        className="absolute start-0 top-1/2 z-[2] hidden h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-ink-900/90 text-white shadow-lg backdrop-blur-sm transition hover:border-copper-400/50 hover:bg-ink-800 disabled:pointer-events-none disabled:opacity-0 md:inline-flex"
       >
-        <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+        <ChevronRight className="h-4 w-4" strokeWidth={2} aria-hidden />
       </button>
       <button
         type="button"
         onClick={() => scrollByDir(1)}
         disabled={!canNext}
         aria-label="دسته‌های بعدی"
-        className="absolute right-0 top-[1.85rem] z-[2] hidden h-9 w-9 translate-x-1 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-ink-900/90 text-white shadow-lg backdrop-blur-sm transition hover:border-copper-400/50 hover:bg-ink-800 disabled:pointer-events-none disabled:opacity-0 md:inline-flex"
+        className="absolute end-0 top-1/2 z-[2] hidden h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-ink-900/90 text-white shadow-lg backdrop-blur-sm transition hover:border-copper-400/50 hover:bg-ink-800 disabled:pointer-events-none disabled:opacity-0 md:inline-flex"
       >
-        <ChevronRight className="h-4 w-4" strokeWidth={2} />
+        <ChevronLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
       </button>
 
       <div
         ref={scrollerRef}
         dir="ltr"
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth px-2 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] md:gap-5 md:px-8 [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 [scrollbar-width:none] md:gap-4 md:px-10 [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {categories.map((c) => (
           <Link
             key={c.id}
             to={`/products?category=${c.id}`}
-            className="group flex w-[4.75rem] shrink-0 snap-start flex-col items-center gap-2.5 text-center focus-visible:outline-none md:w-[5.25rem]"
+            className="group flex w-[9.5rem] shrink-0 snap-start flex-col outline-none focus-visible:ring-2 focus-visible:ring-copper-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950 sm:w-[11rem]"
           >
-            <span className="relative flex h-[4.75rem] w-[4.75rem] items-center justify-center md:h-[5.25rem] md:w-[5.25rem]">
+            <span className="relative aspect-[5/4] overflow-hidden rounded-2xl bg-ink-900">
+              <CategoryMedia category={c} />
               <span
-                className="absolute inset-0 rounded-full bg-gradient-to-br from-copper-400/35 via-white/5 to-sea-600/30 opacity-70 transition duration-300 group-hover:opacity-100 group-hover:shadow-[0_0_24px_rgba(232,168,124,0.25)]"
+                className="absolute inset-0 bg-gradient-to-t from-ink-950/60 via-transparent to-transparent opacity-80"
                 aria-hidden
               />
-              <span className="relative h-[calc(100%-6px)] w-[calc(100%-6px)] overflow-hidden rounded-full border border-white/15 bg-ink-900/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition duration-300 group-hover:border-copper-400/45 group-focus-visible:ring-2 group-focus-visible:ring-copper-400 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-ink-950">
-                {c.image ? (
-                  <img
-                    src={mediaSrc(c.image)}
-                    alt=""
-                    className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-110 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/10 to-white/[0.03]">
-                    <span className="font-display text-xl font-bold text-white/35 md:text-2xl">
-                      {c.name?.slice(0, 1)}
-                    </span>
-                  </span>
-                )}
-              </span>
             </span>
-            <span className="line-clamp-2 min-h-[2.25rem] px-0.5 text-[11px] font-semibold leading-tight text-white/75 transition group-hover:text-white md:text-xs">
-              {c.name}
+            <span className="mt-2.5 flex items-center justify-between gap-2 px-0.5">
+              <span className="min-w-0 truncate text-sm font-semibold text-white/80 transition group-hover:text-white">
+                {c.name}
+              </span>
+              <ArrowUpLeft
+                className="h-3.5 w-3.5 shrink-0 text-white/30 transition group-hover:text-copper-400"
+                strokeWidth={2}
+                aria-hidden
+              />
             </span>
           </Link>
         ))}
@@ -375,14 +379,15 @@ export default function HomePage() {
   const featured = data?.featured_products || []
   const categories = data?.categories || []
   const company = data?.config || {}
+  const tagline = settings.tagline || 'تکنولوژی روز، انتخاب مطمئن'
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-clip">
       <Seo
         title="خانه"
         description={
           settings.tagline ||
-          'خرید و فروش تخصصی گجت‌های روز — هدفون، ساعت هوشمند، لوازم موبایل و گیمینگ'
+          'خرید و فروش تخصصی گجت‌های روز. هدفون، ساعت هوشمند، لوازم موبایل و گیمینگ'
         }
         path="/"
         jsonLd={[
@@ -405,175 +410,216 @@ export default function HomePage() {
         ]}
       />
 
-      {/* Hero — full-bleed, brand-first */}
-      <section className="relative min-h-[88vh] overflow-hidden bg-hero-mesh text-white">
-        <div className="hero-noise absolute inset-0 opacity-[0.35]" aria-hidden />
-        <div className="absolute inset-0" aria-hidden>
-          <div className="absolute -right-24 top-16 h-[28rem] w-[28rem] rounded-full bg-copper-400/20 blur-3xl animate-orb" />
-          <div className="absolute -left-20 bottom-10 h-[22rem] w-[22rem] rounded-full bg-sea-500/25 blur-3xl animate-orb-slow" />
-          <div className="absolute left-1/2 top-1/3 h-40 w-40 -translate-x-1/2 rounded-full bg-white/5 blur-2xl animate-pulse-soft" />
+      {/* Hero: brand first, one composition, search + CTAs */}
+      <section className="relative overflow-hidden bg-hero-mesh text-white">
+        <div className="hero-noise absolute inset-0 opacity-[0.28]" aria-hidden />
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          <div className="absolute -start-16 top-10 h-52 w-52 rounded-full bg-sea-500/20 blur-3xl animate-orb-slow" />
+          <div className="absolute -end-10 bottom-0 h-56 w-56 rounded-full bg-copper-400/18 blur-3xl animate-orb" />
         </div>
 
-        <div className="relative mx-auto flex min-h-[88vh] max-w-6xl flex-col justify-end px-4 pb-16 pt-28 md:justify-center md:pb-24 md:pt-20">
-          <div className="max-w-xl animate-rise">
+        <div className="relative mx-auto grid min-h-[min(88dvh,42rem)] max-w-6xl items-end gap-10 px-4 pb-14 pt-20 sm:pb-16 sm:pt-24 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-center lg:gap-14 lg:pb-20 lg:pt-24">
+          <Reveal className="min-w-0">
             <BrandLogo size="hero" className="block" restClass="text-white" />
-            <h1 className="mt-5 text-xl font-medium leading-9 text-white/90 md:text-2xl md:leading-10">
-              {settings.tagline || 'تکنولوژی روز، انتخاب مطمئن'}
+            <h1 className="mt-5 font-display text-2xl font-bold leading-tight text-white/90 sm:text-3xl md:text-4xl">
+              {tagline}
             </h1>
-            <p className="mt-4 max-w-md text-sm leading-7 text-white/60 md:text-base md:leading-8">
-              از هدفون و ساعت هوشمند تا لوازم گیمینگ — خرید امن، ارسال سریع، پشتیبانی واقعی.
+            <p className="mt-3 max-w-[34ch] text-sm leading-7 text-white/55 sm:max-w-md sm:text-base sm:leading-8">
+              از هدفون و ساعت هوشمند تا لوازم گیمینگ. خرید امن، ارسال سریع، پشتیبانی واقعی.
             </p>
             <HomeSearchBar />
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/products" className="btn-primary min-h-11 cursor-pointer px-7">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link
+                to="/products"
+                className="btn-primary min-h-11 cursor-pointer px-7 active:scale-[0.98]"
+              >
                 مشاهده محصولات
               </Link>
-              <Link to="/categories" className="btn-ghost min-h-11 cursor-pointer">
+              <Link to="/categories" className="btn-ghost min-h-11 cursor-pointer active:scale-[0.98]">
                 دسته‌بندی‌ها
               </Link>
             </div>
-          </div>
+          </Reveal>
 
-          <div className="pointer-events-none absolute inset-y-0 left-0 hidden w-[48%] md:block" aria-hidden>
-            <div className="absolute inset-8 flex flex-col overflow-hidden rounded-[2.5rem] border border-white/10 bg-transparent shadow-[0_40px_80px_rgba(0,0,0,0.2)] backdrop-blur-sm animate-floaty">
+          <Reveal delay={80} className="relative hidden min-h-[16rem] lg:block">
+            <div className="absolute inset-y-4 start-8 end-0 overflow-hidden rounded-2xl border border-white/10 bg-ink-950/40">
               {heroImage ? (
-                <div className="relative min-h-0 flex-1">
-                  <img
-                    src={mediaSrc(heroImage)}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading="eager"
-                    fetchPriority="high"
-                  />
-                </div>
+                <img
+                  src={mediaSrc(heroImage)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="eager"
+                  fetchPriority="high"
+                />
+              ) : categories[0] ? (
+                <CategoryMedia category={categories[0]} />
               ) : (
-                <div className="relative min-h-0 flex-1 bg-transparent" />
+                <div className="h-full w-full bg-gradient-to-br from-ink-900 to-sea-600/30" />
               )}
-              <div className="relative z-10 shrink-0 bg-transparent px-10 pb-10 pt-5">
-                <div className="h-px w-full bg-gradient-to-l from-copper-400 to-transparent" />
-                <p className="mt-4 font-display text-2xl font-bold text-white/90">{heroTitle}</p>
-                <p className="mt-1 text-sm text-white/50">{heroSubtitle}</p>
+              <div className="absolute inset-0 bg-gradient-to-l from-ink-950/10 via-transparent to-ink-950/70" aria-hidden />
+              <div className="absolute inset-x-0 bottom-0 p-6">
+                <p className="font-display text-xl font-bold text-white/90">{heroTitle}</p>
+                <p className="mt-1 text-sm text-white/45">{heroSubtitle}</p>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-bounce-soft text-white/40" aria-hidden>
-          <ChevronDown className="h-6 w-6" strokeWidth={1.5} />
+            <div className="absolute -start-2 bottom-0 top-14 w-[52%] overflow-hidden rounded-2xl border border-white/10 shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
+              {categories[1] ? (
+                <CategoryMedia category={categories[1]} />
+              ) : featured[0]?.primary_image ? (
+                <img
+                  src={mediaSrc(featured[0].primary_image)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-copper-600/40 to-ink-900" />
+              )}
+            </div>
+          </Reveal>
         </div>
       </section>
 
-      {/* Trust / benefits */}
-      <section className="relative z-10 -mt-8 px-4">
-        <Reveal className="reveal-scope mx-auto grid max-w-6xl gap-3 rounded-3xl border border-mist-200/80 bg-white/90 p-3 shadow-soft backdrop-blur sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:p-2">
-          {BENEFITS.map((b, i) => (
-            <div
-              key={b.title}
-              className="reveal flex gap-3 rounded-2xl px-4 py-5 transition hover:bg-mist-50"
-              style={{ transitionDelay: `${i * 80}ms` }}
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-copper-400">
-                {b.icon}
+      {/* Benefits: strip without card chrome */}
+      <section className="border-b border-mist-200 bg-white/70">
+        <Reveal className="mx-auto grid max-w-6xl gap-0 sm:grid-cols-2 lg:grid-cols-4">
+          {BENEFITS.map((b, i) => {
+            const Icon = b.icon
+            return (
+              <div
+                key={b.title}
+                className={cn(
+                  'flex gap-3 px-4 py-7 sm:px-5',
+                  i > 0 && 'border-t border-mist-200 sm:border-t-0',
+                  i % 2 === 1 && 'sm:border-s sm:border-mist-200',
+                  i >= 2 && 'lg:border-s lg:border-mist-200',
+                )}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-copper-400">
+                  <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink-900">{b.title}</p>
+                  <p className="mt-1 text-xs leading-6 text-ink-700/55">{b.text}</p>
+                </div>
               </div>
-              <div>
-                <div className="font-semibold text-ink-900">{b.title}</div>
-                <p className="mt-1 text-xs leading-6 text-ink-700/60">{b.text}</p>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </Reveal>
       </section>
 
       {/* Featured */}
-      <section className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-        <Reveal className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold tracking-widest text-copper-600">FEATURED</p>
-            <h2 className="mt-2 font-display text-3xl font-bold text-ink-900 md:text-4xl">محصولات ویژه</h2>
-            <p className="mt-2 text-sm text-ink-700/60">منتخب‌هایی که این هفته بیشتر دیده شدند</p>
+      <section className="mx-auto max-w-6xl px-4 py-14 md:py-20">
+        <Reveal className="mb-8 flex flex-col gap-4 sm:mb-10 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 max-w-lg">
+            <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl md:text-4xl">
+              محصولات ویژه
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-ink-700/55">
+              منتخب‌هایی که این هفته بیشتر دیده شدند.
+            </p>
           </div>
-          <Link to="/products" className="cursor-pointer text-sm font-semibold text-sea-600 transition hover:text-copper-600">
-            همه محصولات ←
+          <Link
+            to="/products"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-sea-600 transition hover:text-copper-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
+          >
+            مشاهده محصولات
+            <ArrowUpLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
           </Link>
         </Reveal>
         {loading ? (
           <SkeletonGrid />
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {featured.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
-            {!featured.length && (
-              <p className="col-span-full text-sm text-ink-700/50">هنوز محصول ویژه‌ای ثبت نشده است.</p>
-            )}
+            {!featured.length ? (
+              <p className="col-span-full py-10 text-center text-sm text-ink-700/50">
+                هنوز محصول ویژه‌ای ثبت نشده است.
+              </p>
+            ) : null}
           </div>
         )}
       </section>
 
       {/* Categories */}
-      <section className="relative overflow-hidden border-y border-mist-200 bg-ink-950 py-12 text-white md:py-16">
+      <section className="relative overflow-hidden bg-ink-950 py-12 text-white md:py-16">
         <div
-          className="pointer-events-none absolute -left-24 top-0 h-56 w-56 rounded-full bg-copper-400/15 blur-3xl"
+          className="pointer-events-none absolute -start-24 top-0 h-56 w-56 rounded-full bg-copper-400/15 blur-3xl"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -right-16 bottom-0 h-48 w-48 rounded-full bg-sea-600/20 blur-3xl"
+          className="pointer-events-none absolute -end-16 bottom-0 h-48 w-48 rounded-full bg-sea-600/20 blur-3xl"
           aria-hidden
         />
         <div className="relative mx-auto max-w-6xl px-4">
           <Reveal className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold tracking-[0.2em] text-copper-400">CATEGORIES</p>
-              <h2 className="mt-2 font-display text-2xl font-bold tracking-tight md:text-3xl">
+            <div className="min-w-0 max-w-lg">
+              <h2 className="font-display text-2xl font-bold tracking-tight md:text-3xl">
                 دسته‌بندی‌ها
               </h2>
-              <p className="mt-1 text-sm text-white/50">اسکرول افقی کنید و دسته مورد نظر را انتخاب کنید</p>
+              <p className="mt-2 text-sm text-white/50">دسته مورد نظرتان را انتخاب کنید.</p>
             </div>
             <Link
               to="/categories"
-              className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-copper-400 transition hover:border-copper-400/40 hover:bg-white/10 hover:text-copper-300"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-copper-400 transition hover:text-copper-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
             >
               همه دسته‌ها
-              <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
+              <ArrowUpLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
             </Link>
           </Reveal>
-
           <CategoryRail categories={categories} loading={loading} />
         </div>
       </section>
 
-      {/* Steps */}
-      <section className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-        <Reveal className="text-center">
-          <p className="text-xs font-semibold tracking-widest text-copper-600">HOW IT WORKS</p>
-          <h2 className="mt-2 font-display text-3xl font-bold text-ink-900 md:text-4xl">مسیر خرید ساده</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-ink-700/60">در چهار قدم تا رسیدن گجت به دستتان</p>
+      {/* Steps: timeline, not four equal cards */}
+      <section className="mx-auto max-w-6xl px-4 py-14 md:py-20">
+        <Reveal className="max-w-lg">
+          <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl md:text-4xl">
+            مسیر خرید ساده
+          </h2>
+          <p className="mt-2 text-sm leading-7 text-ink-700/55">
+            از انتخاب تا تحویل، در چهار قدم.
+          </p>
         </Reveal>
-        <Reveal className="reveal-scope mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {STEPS.map((s, i) => (
-            <div key={s.n} className="reveal relative rounded-2xl border border-mist-200 bg-white p-6 shadow-soft" style={{ transitionDelay: `${i * 90}ms` }}>
-              <div className="font-display text-3xl font-extrabold text-copper-500/80">{s.n}</div>
-              <div className="mt-3 font-semibold text-ink-900">{s.t}</div>
-              <p className="mt-2 text-xs leading-6 text-ink-700/55">{s.d}</p>
-            </div>
-          ))}
+        <Reveal className="mt-10 border-s border-mist-200">
+          <ol className="space-y-0">
+            {STEPS.map((s, i) => (
+              <li
+                key={s.t}
+                className="relative grid gap-2 border-b border-mist-200 py-5 ps-6 last:border-b-0 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-baseline sm:gap-8 sm:py-6 sm:ps-8"
+              >
+                <span className="font-display text-lg font-bold tabular-nums text-copper-500/90">
+                  {faDigits(String(i + 1).padStart(2, '0'))}
+                </span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-ink-900">{s.t}</p>
+                  <p className="mt-1 text-sm leading-7 text-ink-700/55">{s.d}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </Reveal>
       </section>
 
-      {/* CTA band */}
-      <section className="px-4 pb-20">
-        <Reveal className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-gradient-to-l from-ink-950 via-ink-900 to-sea-600 px-8 py-14 text-white md:px-14">
-          <div className="absolute -left-10 top-0 h-56 w-56 rounded-full bg-copper-400/20 blur-3xl animate-orb" aria-hidden />
-          <div className="relative max-w-xl">
-            <h2 className="font-display text-3xl font-bold md:text-4xl">همین امروز گجتت را پیدا کن</h2>
-            <p className="mt-3 text-sm leading-7 text-white/65">
-              کاتالوگ به‌روز، قیمت شفاف و پرداخت امن — برای شروع کافی است یک محصول را انتخاب کنید.
+      {/* Closing band */}
+      <section className="border-t border-mist-200 px-4 py-14 md:py-16">
+        <Reveal className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 max-w-md">
+            <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">
+              نیاز به راهنمایی دارید؟
+            </h2>
+            <p className="mt-2 text-sm leading-7 text-ink-700/55">
+              برای انتخاب گجت مناسب، با ما در تماس باشید.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/products" className="btn-primary cursor-pointer">شروع خرید</Link>
-              <Link to="/contact" className="btn-ghost cursor-pointer">مشاوره بگیرید</Link>
-            </div>
           </div>
+          <Link
+            to="/contact"
+            className="btn-dark inline-flex min-h-11 w-fit shrink-0 cursor-pointer px-6 active:scale-[0.98]"
+          >
+            مشاوره بگیرید
+          </Link>
         </Reveal>
       </section>
     </div>

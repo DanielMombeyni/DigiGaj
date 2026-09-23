@@ -37,6 +37,10 @@
   --ink: var(--color-ink-950);
   --mist: var(--color-mist-50);
   --sea: var(--color-sea-500);
+  /* Video hero theme (HSL channels for Tailwind alpha) */
+  --hero-bg: 260 87% 3%;
+  --foreground: 40 6% 95%;
+  --hero-sub: 40 6% 82%;
   --hero-mesh: radial-gradient(ellipse 80% 60% at 70% 20%, color-mix(in srgb, var(--color-copper-400) 28%, transparent), transparent 55%),
     radial-gradient(ellipse 60% 50% at 10% 80%, color-mix(in srgb, var(--color-sea-400) 22%, transparent), transparent 50%),
     linear-gradient(165deg, #070b14 0%, #121c2e 45%, #182636 100%);
@@ -91,6 +95,41 @@ body {
   }
   .btn-dark {
     @apply btn bg-ink-900 text-mist-50 hover:bg-ink-800;
+  }
+  .liquid-glass {
+    background: rgba(255, 255, 255, 0.01);
+    background-blend-mode: luminosity;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: none;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  .liquid-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.4px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.15) 20%,
+      rgba(255, 255, 255, 0) 40%,
+      rgba(255, 255, 255, 0) 60%,
+      rgba(255, 255, 255, 0.15) 80%,
+      rgba(255, 255, 255, 0.45) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .btn-hero-secondary {
+    @apply liquid-glass inline-flex cursor-pointer items-center justify-center rounded-full text-sm font-semibold text-foreground transition duration-200 hover:bg-white/[0.04] active:scale-[0.98];
   }
   .input {
     @apply w-full max-w-full min-w-0 rounded-xl border border-mist-200 bg-surface px-4 py-2.5 text-sm text-ink-900 outline-none transition focus:border-sea-400 focus:ring-2 focus:ring-sea-400/20;
@@ -188,6 +227,14 @@ body {
   mix-blend-mode: overlay;
 }
 
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass {
+    background: rgba(20, 16, 32, 0.88);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 /* Branded page loader */
 .loader-ring {
   border: 1.5px solid transparent;
@@ -260,7 +307,8 @@ body {
   .animate-orb-slow,
   .animate-pulse-soft,
   .animate-bounce-soft,
-  .animate-shimmer {
+  .animate-shimmer,
+  .animate-logo-marquee {
     animation: none !important;
   }
   .loader-ring,

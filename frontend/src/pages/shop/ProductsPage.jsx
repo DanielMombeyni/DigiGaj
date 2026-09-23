@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { ProductCard } from '@/components/shop/ProductCard'
 import FilterSelect from '@/components/shop/FilterSelect'
@@ -11,7 +11,7 @@ import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { useDebounce } from '@/hooks/useDebounce'
 import { categorySelectOptions } from '@/utils/categories'
-import { faDigits } from '@/utils/format'
+import { cn, faDigits } from '@/utils/format'
 
 const SORT_OPTIONS = [
   { value: '-created_at', label: 'جدیدترین' },
@@ -45,7 +45,71 @@ function parsePriceParam(value, fallback) {
 
 function filtersDefaultOpen() {
   if (typeof window === 'undefined') return true
-  return window.matchMedia('(min-width: 768px)').matches
+  return window.matchMedia('(min-width: 1024px)').matches
+}
+
+function ProductsSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3">
+      {Array.from({ length: 9 }).map((_, i) => (
+        <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-mist-100" />
+      ))}
+    </div>
+  )
+}
+
+function FilterFields({
+  categories,
+  category,
+  setCategory,
+  ordering,
+  setOrdering,
+  minRating,
+  setMinRating,
+  boundsReady,
+  priceBounds,
+  priceRange,
+  setPriceRange,
+}) {
+  return (
+    <div className="space-y-6">
+      <FilterSelect
+        label="دسته‌بندی"
+        id="filter-category"
+        value={category}
+        onChange={setCategory}
+        options={categorySelectOptions(categories, { includeRootLabel: true })}
+      />
+
+      <FilterSelect
+        label="مرتب‌سازی"
+        id="filter-sort"
+        value={ordering}
+        onChange={setOrdering}
+        options={SORT_OPTIONS}
+      />
+
+      <div>
+        <StarRatingFilter value={minRating} onChange={setMinRating} />
+      </div>
+
+      <div>
+        <span className="label">بازه قیمت (تومان)</span>
+        {boundsReady ? (
+          <PriceRangeSlider
+            min={priceBounds.floor}
+            max={priceBounds.ceil}
+            valueMin={priceRange[0]}
+            valueMax={priceRange[1]}
+            step={PRICE_STEP}
+            onChange={setPriceRange}
+          />
+        ) : (
+          <div className="mt-2 h-9 animate-pulse rounded-xl bg-mist-100" />
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function ProductsPage() {
@@ -158,7 +222,6 @@ export default function ProductsPage() {
     }
   }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, page, params, setParams])
 
-  // Reset to page 1 when filters change (keep page when only page itself changes)
   const filterKey = `${debouncedQ}|${category}|${apiMin}|${apiMax}|${minRating}|${ordering}`
   const prevFilterKey = useRef(filterKey)
   useEffect(() => {
@@ -222,20 +285,29 @@ export default function ProductsPage() {
     [category, priceFiltered, minRating, ordering],
   )
 
+  const anyFilterActive = Boolean(debouncedQ || panelFiltersActive)
+
   const activeFilterLabels = useMemo(() => {
     const labels = []
     if (category) {
       const cat = categories.find((c) => String(c.id) === category)
       labels.push(cat?.name || 'دسته‌بندی')
     }
-    if (minRating) labels.push(`${minRating} ستاره به بالا`)
+    if (minRating) labels.push(`${faDigits(minRating)} ستاره به بالا`)
     if (priceFiltered) {
-      labels.push(`قیمت ${debouncedRange[0].toLocaleString('fa-IR')}–${debouncedRange[1].toLocaleString('fa-IR')}`)
+      labels.push(
+        `قیمت ${debouncedRange[0].toLocaleString('fa-IR')} تا ${debouncedRange[1].toLocaleString('fa-IR')}`,
+      )
     }
     const sortLabel = SORT_OPTIONS.find((o) => o.value === ordering)?.label
     if (ordering && ordering !== '-created_at' && sortLabel) labels.push(sortLabel)
     return labels
   }, [category, categories, minRating, priceFiltered, debouncedRange, ordering])
+
+  const activeCategoryName = useMemo(() => {
+    if (!category) return null
+    return categories.find((c) => String(c.id) === category)?.name || null
+  }, [category, categories])
 
   const seoQuery = buildParams({
     search: debouncedQ,
@@ -247,165 +319,284 @@ export default function ProductsPage() {
     page,
   }).toString()
 
+  const filterProps = {
+    categories,
+    category,
+    setCategory,
+    ordering,
+    setOrdering,
+    minRating,
+    setMinRating,
+    boundsReady,
+    priceBounds,
+    priceRange,
+    setPriceRange,
+  }
+
   return (
-    <div className="mx-auto min-w-0 max-w-6xl px-4 py-10 md:py-14">
+    <div className="min-w-0 overflow-x-clip">
       <Seo
         title="محصولات"
-        description={`کاتالوگ گجت‌ها و لوازم دیجیتال ${brand.name} — فیلتر دسته‌بندی، بازه قیمت و مرتب‌سازی`}
+        description={`کاتالوگ گجت‌ها و لوازم دیجیتال ${brand.name}. فیلتر دسته‌بندی، بازه قیمت و مرتب‌سازی`}
         path={`/products${seoQuery ? `?${seoQuery}` : ''}`}
       />
-      <Reveal className="flex min-w-0 flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold tracking-widest text-copper-600">CATALOG</p>
-          <h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">محصولات</h1>
-          <p className="mt-2 text-sm text-ink-700/60">گجت‌ها و لوازم دیجیتال با قیمت شفاف</p>
-        </div>
-        <label className="block min-w-0 w-full md:max-w-sm">
-          <span className="sr-only">جستجوی محصول</span>
-          <input
-            className="input"
-            placeholder="جستجو در نام و برند..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
-      </Reveal>
 
-      <Reveal className="mt-8 min-w-0 overflow-hidden rounded-2xl border border-mist-200/80 bg-white/80 shadow-soft">
-        <div className="flex items-center gap-3 border-b border-mist-100 p-4">
-          <button
-            type="button"
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-start"
-            onClick={() => setFiltersOpen((open) => !open)}
-            aria-expanded={filtersOpen}
-            aria-controls="products-filters-panel"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-mist-100 text-ink-700/70">
-              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.75} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-ink-950">فیلترها</span>
-              {!filtersOpen && activeFilterLabels.length > 0 && (
-                <span className="mt-0.5 block truncate text-xs text-ink-700/55">
-                  {activeFilterLabels.join(' · ')}
-                </span>
-              )}
-              {!filtersOpen && !activeFilterLabels.length && (
-                <span className="mt-0.5 block text-xs text-ink-700/45">دسته‌بندی، امتیاز، قیمت و مرتب‌سازی</span>
-              )}
-            </span>
-            <ChevronDown
-              className={`h-5 w-5 shrink-0 text-ink-700/45 transition-transform duration-300 ${
-                filtersOpen ? 'rotate-180' : ''
-              }`}
-              strokeWidth={1.75}
-            />
-          </button>
-          {panelFiltersActive && (
-            <button
-              type="button"
-              className="shrink-0 cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-sea-600 transition hover:bg-sea-50 hover:text-copper-600"
-              onClick={clearFilters}
+      {/* Full-bleed hero: brand first, search as primary action */}
+      <section className="relative overflow-hidden bg-hero-mesh text-white">
+        <div className="hero-noise absolute inset-0 opacity-[0.28]" aria-hidden />
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          <div className="absolute -start-16 top-10 h-52 w-52 rounded-full bg-sea-500/20 blur-3xl animate-orb-slow" />
+          <div className="absolute -end-10 bottom-0 h-56 w-56 rounded-full bg-copper-400/18 blur-3xl animate-orb" />
+        </div>
+
+        <div className="relative mx-auto max-w-6xl px-4 pb-12 pt-16 sm:pb-14 sm:pt-20 lg:pb-16 lg:pt-20">
+          <Reveal className="min-w-0 max-w-2xl">
+            <p className="font-display text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
+              {brand.name}
+            </p>
+            <h1 className="mt-4 font-display text-2xl font-bold leading-tight text-white/90 sm:text-3xl md:text-4xl">
+              {activeCategoryName || 'محصولات'}
+            </h1>
+            <p className="mt-3 max-w-[32ch] text-sm leading-7 text-white/55 sm:max-w-md sm:text-base sm:leading-8">
+              {debouncedQ
+                ? `نتایج جست‌وجو برای «${debouncedQ}»`
+                : 'گجت‌ها و لوازم دیجیتال با قیمت شفاف و فیلتر دقیق.'}
+            </p>
+
+            <form
+              className="mt-7"
+              onSubmit={(e) => {
+                e.preventDefault()
+              }}
             >
-              پاک کردن
-            </button>
-          )}
-        </div>
-
-        <div
-          id="products-filters-panel"
-          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-            filtersOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-          }`}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="p-4 pt-3">
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <FilterSelect
-                  label="دسته‌بندی"
-                  id="filter-category"
-                  value={category}
-                  onChange={setCategory}
-                  options={categorySelectOptions(categories, { includeRootLabel: true })}
-                />
-
-                <FilterSelect
-                  label="مرتب‌سازی"
-                  id="filter-sort"
-                  value={ordering}
-                  onChange={setOrdering}
-                  options={SORT_OPTIONS}
-                />
-              </div>
-
-              <div className="mt-4 min-w-0 border-t border-mist-100 pt-4">
-                <StarRatingFilter value={minRating} onChange={setMinRating} />
-              </div>
-
-              <div className="mt-4 min-w-0 border-t border-mist-100 pt-4">
-                <span className="label">بازه قیمت (تومان)</span>
-                {boundsReady ? (
-                  <PriceRangeSlider
-                    min={priceBounds.floor}
-                    max={priceBounds.ceil}
-                    valueMin={priceRange[0]}
-                    valueMax={priceRange[1]}
-                    step={PRICE_STEP}
-                    onChange={setPriceRange}
+              <label className="block min-w-0 max-w-lg">
+                <span className="sr-only">جستجوی محصول</span>
+                <div className="flex overflow-hidden rounded-2xl border border-white/15 bg-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md focus-within:border-copper-400/50">
+                  <input
+                    type="search"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/40"
+                    placeholder="جستجو در نام و برند..."
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
                   />
+                  <span className="flex items-center px-4 text-white/45" aria-hidden>
+                    <Search className="h-4 w-4" strokeWidth={1.75} />
+                  </span>
+                </div>
+              </label>
+            </form>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <Link
+                to="/categories"
+                className="btn-ghost min-h-11 cursor-pointer px-5 active:scale-[0.98]"
+              >
+                دسته‌بندی‌ها
+              </Link>
+              {!loading ? (
+                <p className="text-xs text-white/40">
+                  <span className="tabular-nums text-white/70">{faDigits(totalCount)}</span>
+                  {' '}
+                  محصول
+                </p>
+              ) : null}
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-6xl min-w-0 px-4 py-10 sm:py-12 md:py-14">
+        <div className="grid gap-10 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-14">
+          {/* Desktop sticky filters */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-28 space-y-6 border-s border-mist-200 ps-5">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-ink-900">فیلترها</h2>
+                {panelFiltersActive ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="cursor-pointer text-xs font-medium text-sea-600 transition hover:text-copper-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
+                  >
+                    پاک کردن
+                  </button>
+                ) : null}
+              </div>
+              <FilterFields {...filterProps} />
+            </div>
+          </aside>
+
+          <div className="min-w-0">
+            {/* Mobile filters */}
+            <div className="mb-8 lg:hidden">
+              <div className="flex items-center gap-2 border-b border-mist-200 pb-3">
+                <button
+                  type="button"
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400"
+                  onClick={() => setFiltersOpen((open) => !open)}
+                  aria-expanded={filtersOpen}
+                  aria-controls="products-filters-panel"
+                >
+                  <SlidersHorizontal className="h-4 w-4 shrink-0 text-ink-700/55" strokeWidth={1.75} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink-900">فیلترها</span>
+                    {!filtersOpen && activeFilterLabels.length > 0 ? (
+                      <span className="mt-0.5 block truncate text-xs text-ink-700/50">
+                        {activeFilterLabels.join(' / ')}
+                      </span>
+                    ) : null}
+                    {!filtersOpen && !activeFilterLabels.length ? (
+                      <span className="mt-0.5 block text-xs text-ink-700/40">
+                        دسته، امتیاز، قیمت و مرتب‌سازی
+                      </span>
+                    ) : null}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'h-5 w-5 shrink-0 text-ink-700/40 transition-transform duration-300',
+                      filtersOpen && 'rotate-180',
+                    )}
+                    strokeWidth={1.75}
+                  />
+                </button>
+                {panelFiltersActive ? (
+                  <button
+                    type="button"
+                    className="shrink-0 cursor-pointer rounded-lg px-2.5 py-2 text-xs font-medium text-sea-600 transition hover:bg-mist-100 hover:text-copper-600"
+                    onClick={clearFilters}
+                  >
+                    پاک کردن
+                  </button>
+                ) : null}
+              </div>
+
+              <div
+                id="products-filters-panel"
+                className={cn(
+                  'grid transition-[grid-template-rows] duration-300 ease-out',
+                  filtersOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="pt-5">
+                    <FilterFields {...filterProps} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Results meta */}
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-ink-700/55">
+                {loading ? (
+                  'در حال بارگذاری...'
                 ) : (
-                  <div className="mt-2 h-9 animate-pulse rounded-xl bg-mist-100" />
+                  <>
+                    <span className="font-semibold tabular-nums text-ink-900">
+                      {faDigits(totalCount)}
+                    </span>
+                    {' '}
+                    محصول
+                    {activeCategoryName ? (
+                      <>
+                        {' '}
+                        در
+                        {' '}
+                        <span className="font-semibold text-ink-800">{activeCategoryName}</span>
+                      </>
+                    ) : null}
+                  </>
+                )}
+              </p>
+              {anyFilterActive && !loading ? (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-ink-700/50 transition hover:text-copper-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400 lg:hidden"
+                >
+                  <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                  حذف فیلترها
+                </button>
+              ) : null}
+            </div>
+
+            {loading ? (
+              <ProductsSkeleton />
+            ) : items.length ? (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+                  {items.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+
+                {totalPages > 1 ? (
+                  <div className="mt-12 flex flex-wrap items-center justify-center gap-2 border-t border-mist-200 pt-8">
+                    <button
+                      type="button"
+                      className="btn-secondary min-h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
+                      disabled={page <= 1 || loading}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      قبلی
+                    </button>
+                    <span className="px-3 py-2 text-xs font-semibold tabular-nums text-ink-700/60">
+                      صفحه {faDigits(page)} از {faDigits(totalPages)}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-secondary min-h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.98]"
+                      disabled={page >= totalPages || loading}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      بعدی
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="px-1 py-16 text-center">
+                <p className="text-sm text-ink-700/55">محصولی با این فیلتر پیدا نشد.</p>
+                {anyFilterActive ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="btn-primary mt-6 inline-flex min-h-11 cursor-pointer active:scale-[0.98]"
+                  >
+                    پاک کردن فیلترها
+                  </button>
+                ) : (
+                  <Link
+                    to="/categories"
+                    className="btn-primary mt-6 inline-flex min-h-11 cursor-pointer active:scale-[0.98]"
+                  >
+                    مشاهده دسته‌ها
+                  </Link>
                 )}
               </div>
-            </div>
+            )}
+
+            <Reveal className="mt-16 border-t border-mist-200 pt-10 sm:mt-20 sm:pt-12">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0 max-w-md">
+                  <h2 className="font-display text-xl font-bold text-ink-900 sm:text-2xl">
+                    بازگشت به فروشگاه
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-ink-700/55">
+                    پیشنهادهای ویژه و معرفی فروشگاه را در صفحه اصلی ببینید.
+                  </p>
+                </div>
+                <Link
+                  to="/"
+                  className="btn-dark inline-flex min-h-11 w-fit shrink-0 cursor-pointer px-6 active:scale-[0.98]"
+                >
+                  صفحه اصلی
+                </Link>
+              </div>
+            </Reveal>
           </div>
         </div>
-      </Reveal>
-
-      <div className="mt-10 min-w-0">
-        {loading ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-mist-100 sm:h-72 sm:aspect-auto" />
-            ))}
-          </div>
-        ) : items.length ? (
-          <>
-            <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-            {totalPages > 1 && (
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary min-h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={page <= 1 || loading}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  قبلی
-                </button>
-                <span className="rounded-xl bg-mist-100 px-3 py-2 text-xs font-semibold tabular-nums text-ink-700/70">
-                  صفحه {faDigits(page)} از {faDigits(totalPages)}
-                </span>
-                <button
-                  type="button"
-                  className="btn-secondary min-h-10 cursor-pointer px-4 text-sm disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={page >= totalPages || loading}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  بعدی
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="rounded-2xl border border-dashed border-mist-200 bg-white px-6 py-16 text-center text-sm text-ink-700/50">
-            محصولی با این فیلتر پیدا نشد.
-          </p>
-        )}
-      </div>
+      </section>
     </div>
   )
 }
