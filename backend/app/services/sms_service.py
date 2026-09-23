@@ -176,6 +176,11 @@ class SmsProviderService:
             return False, "تنظیمات سرویس پیامک ناقص است."
         try:
             return driver.send_otp(phone=phone, code=code, creds=cfg.credentials or {})
-        except Exception:
+        except Exception as exc:
+            from app.sms.signal.exceptions import SignalSmsError
+
+            if isinstance(exc, SignalSmsError):
+                logger.error("SMS send failed via %s: %s", cfg.provider_type, exc)
+                return False, str(exc)
             logger.exception("SMS send failed via %s", cfg.provider_type)
             return False, "خطا در ارسال پیامک"

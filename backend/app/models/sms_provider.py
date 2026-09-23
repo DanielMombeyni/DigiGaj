@@ -7,6 +7,7 @@ class SmsProviderConfig(TimeStampedModel):
     class Provider(models.TextChoices):
         FARAPAYAMAK = "farapayamak", "فراپیامک"
         SMSIR = "smsir", "SMS.ir"
+        SIGNAL = "signal", "سیگنال SMS"
 
     provider_type = models.CharField(
         max_length=32, choices=Provider.choices, unique=True
