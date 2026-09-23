@@ -1,4 +1,4 @@
-from django.db.models import Sum, Count, Q, Min, Max, Prefetch
+from django.db.models import Sum, Count, Q, Min, Max, Prefetch, Case, When, Value, IntegerField
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes, parser_classes
@@ -114,6 +114,19 @@ class ProductViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "brand", "short_description"]
     ordering_fields = ["price_toman", "created_at", "name"]
     ordering = ["-created_at"]
+
+    def filter_queryset(self, queryset):
+        """Apply default DRF filters, then force unpriced products last for price sorts."""
+        qs = super().filter_queryset(queryset)
+        ordering = (self.request.query_params.get("ordering") or "").strip()
+        if ordering not in ("price_toman", "-price_toman"):
+            return qs
+        noprice = Case(
+            When(Q(price_on_request=True) | Q(price_toman__lte=0), then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+        return qs.order_by(noprice, ordering, "id")
 
     def get_queryset(self):
         qs = Product.objects.select_related("category")
