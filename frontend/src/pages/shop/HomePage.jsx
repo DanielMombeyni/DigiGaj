@@ -373,7 +373,7 @@ export default function HomePage() {
   const heroSubtitle = settings.hero_glass_subtitle || 'تجربه خرید گجت، متفاوت'
   const heroImage = settings.hero_glass_image || null
   const featured = data?.featured_products || []
-  const categories = data?.categories || []
+  const categories = (data?.categories || []).filter((c) => c.parent == null)
   const company = data?.config || {}
 
   return (
