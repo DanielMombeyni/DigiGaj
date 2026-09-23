@@ -23,6 +23,15 @@ from app.views.sms_views import (
     AdminSmsCatalogView,
     AdminSmsProviderDetailView,
     AdminSmsProviderListView,
+    AdminSmsProviderTestView,
+)
+from app.views.sms_panel_views import (
+    AdminSmsBalanceView,
+    AdminSmsPanelCatalogView,
+    AdminSmsSendView,
+    AdminSmsTemplateDetailView,
+    AdminSmsTemplateListView,
+    AdminSmsTemplateTestView,
 )
 from app.views.email_views import (
     AdminEmailSmtpTestView,
@@ -81,6 +90,25 @@ urlpatterns = [
         "admin/sms-providers/<int:pk>/",
         AdminSmsProviderDetailView.as_view(),
         name="admin-sms-detail",
+    ),
+    path(
+        "admin/sms-providers/<int:pk>/test/",
+        AdminSmsProviderTestView.as_view(),
+        name="admin-sms-provider-test",
+    ),
+    path("admin/sms/catalog/", AdminSmsPanelCatalogView.as_view(), name="admin-sms-panel-catalog"),
+    path("admin/sms/balance/", AdminSmsBalanceView.as_view(), name="admin-sms-balance"),
+    path("admin/sms/send/", AdminSmsSendView.as_view(), name="admin-sms-send"),
+    path("admin/sms-templates/", AdminSmsTemplateListView.as_view(), name="admin-sms-templates"),
+    path(
+        "admin/sms-templates/<int:pk>/test/",
+        AdminSmsTemplateTestView.as_view(),
+        name="admin-sms-template-test",
+    ),
+    path(
+        "admin/sms-templates/<int:pk>/",
+        AdminSmsTemplateDetailView.as_view(),
+        name="admin-sms-template-detail",
     ),
     path("admin/email-smtp/", AdminEmailSmtpView.as_view(), name="admin-email-smtp"),
     path("admin/email-smtp/test/", AdminEmailSmtpTestView.as_view(), name="admin-email-smtp-test"),

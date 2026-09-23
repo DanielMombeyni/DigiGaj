@@ -22,6 +22,7 @@ FULL_STAFF_PAGES = [
     "customers",
     "storefront",
     "emails",
+    "sms",
 ]
 
 BOOTSTRAP_USERNAME = "daniel"
