@@ -94,14 +94,49 @@ export function applyThemeToDocument(theme, colors = {}) {
   const root = document.documentElement
 
   root.setAttribute('data-theme', themeId)
+  const vars = {}
   Object.entries(CSS_MAP).forEach(([key, cssVar]) => {
     const hex = resolved[key]
     root.style.setProperty(cssVar, hex)
-    root.style.setProperty(`${cssVar}-rgb`, hexToRgbChannels(hex))
+    const rgb = hexToRgbChannels(hex)
+    root.style.setProperty(`${cssVar}-rgb`, rgb)
+    vars[cssVar] = hex
+    vars[`${cssVar}-rgb`] = rgb
   })
   root.style.setProperty('--brand', resolved.copper_500)
+  vars['--brand'] = resolved.copper_500
 
   const surfaceHex = themeId === 'dark' ? resolved.mist_100 : '#ffffff'
+  const surfaceRgb = hexToRgbChannels(surfaceHex)
   root.style.setProperty('--color-surface', surfaceHex)
-  root.style.setProperty('--color-surface-rgb', hexToRgbChannels(surfaceHex))
+  root.style.setProperty('--color-surface-rgb', surfaceRgb)
+  vars['--color-surface'] = surfaceHex
+  vars['--color-surface-rgb'] = surfaceRgb
+
+  persistAppearance({ theme: themeId, vars })
 }
+
+const APPEARANCE_KEY = 'digigaj-appearance'
+
+export function persistAppearance(partial) {
+  if (typeof window === 'undefined') return
+  try {
+    const prev = JSON.parse(localStorage.getItem(APPEARANCE_KEY) || '{}')
+    const next = { ...prev, ...partial, at: Date.now() }
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify(next))
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+export function readAppearance() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(APPEARANCE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+export { APPEARANCE_KEY }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus,
   X,
@@ -28,6 +29,7 @@ import AdminModal, { ModalCancelButton, ModalSubmitButton } from '@/components/d
 import ProductImageLightbox from '@/components/dashboard/ProductImageLightbox'
 import { useConfirm } from '@/components/common/ConfirmProvider'
 import { categorySelectOptions } from '@/utils/categories'
+import { PANEL_BASE } from '@/config/panel'
 import { fetchAllPages } from '@/utils/pagination'
 import LoadingScreen from '@/components/common/LoadingScreen'
 
@@ -328,6 +330,7 @@ function firstFormError(data) {
 
 export default function AdminProductsPage() {
   const confirm = useConfirm()
+  const navigate = useNavigate()
   const formReqId = useRef(0)
   const [categories, setCategories] = useState([])
   const [counts, setCounts] = useState({})
@@ -712,6 +715,7 @@ export default function AdminProductsPage() {
         await adminApi.products.uploadImages(slug, newFiles)
       }
       setOpen(false)
+      navigate(`${PANEL_BASE}/products`, { replace: true })
       load()
     } catch (err) {
       setError(firstFormError(err.response?.data) || err.message || 'خطا در ذخیره')

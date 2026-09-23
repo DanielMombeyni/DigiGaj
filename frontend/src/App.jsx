@@ -4,6 +4,8 @@ import ShopLayout from '@/components/layout/ShopLayout'
 import AdminLayout from '@/components/layout/sidebar/AdminLayout'
 import PublicPageGuard from '@/components/shop/PublicPageGuard'
 import ThemeApplier from '@/components/shop/ThemeApplier'
+import SiteBranding from '@/components/shop/SiteBranding'
+import ScrollToTop from '@/components/common/ScrollToTop'
 import LoadingScreen from '@/components/common/LoadingScreen'
 
 const HomePage = lazy(() => import('@/pages/shop/HomePage'))
@@ -59,7 +61,9 @@ function guard(pageKey, el) {
 export default function App() {
   return (
     <>
+      <ScrollToTop />
       <ThemeApplier />
+      <SiteBranding />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="login" element={guard('login', <LoginPage />)} />

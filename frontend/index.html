@@ -14,6 +14,36 @@
     <meta property="og:locale" content="fa_IR" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="دیجی گج" />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('digigaj-appearance')
+          if (!raw) return
+          var data = JSON.parse(raw)
+          var root = document.documentElement
+          if (data.theme) root.setAttribute('data-theme', data.theme)
+          if (data.vars) {
+            for (var k in data.vars) {
+              if (Object.prototype.hasOwnProperty.call(data.vars, k)) {
+                root.style.setProperty(k, data.vars[k])
+              }
+            }
+          }
+          if (data.site_icon) {
+            var href = data.site_icon
+            ;['icon', 'shortcut icon', 'apple-touch-icon'].forEach(function (rel) {
+              var link = document.querySelector('link[rel="' + rel + '"]')
+              if (!link) {
+                link = document.createElement('link')
+                link.setAttribute('rel', rel)
+                document.head.appendChild(link)
+              }
+              link.setAttribute('href', href)
+            })
+          }
+        } catch (e) {}
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://api.fontshare.com" crossorigin />

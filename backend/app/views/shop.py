@@ -186,6 +186,68 @@ class ProductViewSet(viewsets.ModelViewSet):
             total += row["count"]
         return Response({"counts": counts, "total": total})
 
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="bulk-price-adjust",
+        permission_classes=[IsStaffUser],
+    )
+    def bulk_price_adjust(self, request):
+        """
+        Apply a percentage change to all products that have a fixed price
+        (price_on_request=False and price_toman > 0). Also scales compare_at
+        and non-null variant prices.
+        Body: { "percent": number }  e.g. 10 or -5
+        """
+        try:
+            percent = float(request.data.get("percent"))
+        except (TypeError, ValueError):
+            return Response({"detail": "درصد نامعتبر است"}, status=400)
+        if percent < -90 or percent > 500:
+            return Response(
+                {"detail": "درصد باید بین ۹۰- و ۵۰۰ باشد"},
+                status=400,
+            )
+        if percent == 0:
+            return Response({"updated_products": 0, "updated_variants": 0, "percent": percent})
+
+        factor = 1 + (percent / 100.0)
+        products = list(
+            Product.objects.filter(price_on_request=False, price_toman__gt=0).only(
+                "id", "price_toman", "compare_at_price_toman"
+            )
+        )
+        for p in products:
+            p.price_toman = max(0, int(round(p.price_toman * factor)))
+            if p.compare_at_price_toman:
+                p.compare_at_price_toman = max(
+                    0, int(round(p.compare_at_price_toman * factor))
+                )
+        if products:
+            Product.objects.bulk_update(
+                products, ["price_toman", "compare_at_price_toman"], batch_size=200
+            )
+
+        variants = list(
+            ProductVariant.objects.filter(
+                price_toman__isnull=False,
+                price_toman__gt=0,
+                product__price_on_request=False,
+            ).only("id", "price_toman")
+        )
+        for v in variants:
+            v.price_toman = max(0, int(round(v.price_toman * factor)))
+        if variants:
+            ProductVariant.objects.bulk_update(variants, ["price_toman"], batch_size=200)
+
+        return Response(
+            {
+                "updated_products": len(products),
+                "updated_variants": len(variants),
+                "percent": percent,
+            }
+        )
+
     @action(detail=True, methods=["post"], parser_classes=[MultiPartParser, FormParser])
     def images(self, request, slug=None):
         """Upload one or more images: files under `images` or `image`."""
@@ -525,8 +587,7 @@ def storefront_home(request):
         )[:8]
     )
     categories = (
-        Category.objects.filter(is_active=True)
-        .select_related("parent")
+        Category.objects.filter(is_active=True, parent__isnull=True)
         .annotate(children_count=Count("children"))
         .order_by("sort_order", "name")[:100]
     )
