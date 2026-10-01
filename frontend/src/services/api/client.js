@@ -14,7 +14,9 @@ api.interceptors.request.use((req) => {
   const skipBearer =
     (url.includes('/auth/token/') && !url.includes('/auth/token/refresh/')) ||
     url.includes('/auth/registration/') ||
-    url.includes('/auth/password/reset')
+    url.includes('/auth/google/') ||
+    url.includes('/auth/password/reset') ||
+    url.includes('/auth/password/otp/')
   if (!skipBearer) {
     const token = localStorage.getItem('access_token')
     if (token) {

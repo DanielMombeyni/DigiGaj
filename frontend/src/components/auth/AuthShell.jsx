@@ -89,7 +89,7 @@ export function AuthSuccess({ message }) {
 export function formatAuthError(err, fallback = 'خطایی رخ داد') {
   if (err?.code === 'ERR_NETWORK') return 'ارتباط با سرور برقرار نشد'
   const data = err?.response?.data
-  if (!data) return fallback
+  if (!data || typeof data === 'string') return fallback
   if (typeof data.detail === 'string') return data.detail
   if (data.errors?.detail) {
     return Array.isArray(data.errors.detail) ? data.errors.detail[0] : String(data.errors.detail)

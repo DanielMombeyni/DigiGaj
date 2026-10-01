@@ -6,6 +6,7 @@ import { authApi, shopApi } from '@/services/api'
 import { brand } from '@/config/brand'
 import Seo from '@/components/common/Seo'
 import AuthShell, { AuthError, formatAuthError } from '@/components/auth/AuthShell'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 const METHOD_META = {
   username_password: { id: 'username_password', label: 'نام کاربری', field: 'نام کاربری', placeholder: 'مثلاً ali' },
@@ -37,6 +38,7 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
+  const [googleClientId, setGoogleClientId] = useState('')
 
   const redirectTo = location.state?.from || '/'
 
@@ -51,6 +53,7 @@ export default function LoginPage() {
       .then((r) => {
         const m = { ...DEFAULT_METHODS, ...(r.data.auth_methods || {}) }
         setMethods(m)
+        setGoogleClientId(r.data.google_login?.enabled ? r.data.google_login.client_id || '' : '')
         const first = Object.keys(METHOD_META).find((k) => m[k]) || 'username_password'
         setMethod(first)
       })
@@ -72,7 +75,9 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     try {
-      await login(identifier.trim(), password)
+      const loginId =
+        method === 'username_password' ? identifier.replace(/\s+/g, '') : identifier.trim()
+      await login(loginId, password)
       navigate(redirectTo, { replace: true })
     } catch (err) {
       setError(formatAuthError(err, 'اطلاعات ورود نادرست است'))
@@ -187,6 +192,11 @@ export default function LoginPage() {
                   ? 'در حال ارسال...'
                   : 'دریافت کد'}
             </button>
+            <div className="text-center">
+              <Link to="/forgot-password" className="text-xs font-medium text-sea-600 hover:text-copper-600">
+                فراموشی رمز عبور؟
+              </Link>
+            </div>
             {otpSent && (
               <button
                 type="button"
@@ -210,7 +220,11 @@ export default function LoginPage() {
                 type={meta.type || 'text'}
                 autoComplete={method === 'email_password' ? 'email' : 'username'}
                 value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
+                onChange={(e) =>
+                  setIdentifier(
+                    method === 'username_password' ? e.target.value.replace(/\s+/g, '') : e.target.value,
+                  )
+                }
                 placeholder={meta.placeholder}
                 required
               />
@@ -237,13 +251,11 @@ export default function LoginPage() {
               </div>
             </label>
 
-            {method === 'email_password' && (
-              <div className="flex justify-end">
-                <Link to="/forgot-password" className="text-xs font-medium text-sea-600 hover:text-copper-600">
-                  فراموشی رمز عبور؟
-                </Link>
-              </div>
-            )}
+            <div className="flex justify-end">
+              <Link to="/forgot-password" className="text-xs font-medium text-sea-600 hover:text-copper-600">
+                فراموشی رمز عبور؟
+              </Link>
+            </div>
 
             <AuthError message={error} />
 
@@ -251,6 +263,17 @@ export default function LoginPage() {
               {loading ? 'در حال ورود...' : 'ورود به حساب'}
             </button>
           </form>
+        )}
+
+        {googleClientId && (
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center gap-3 text-[11px] text-ink-700/40">
+              <span className="h-px flex-1 bg-mist-200" />
+              یا
+              <span className="h-px flex-1 bg-mist-200" />
+            </div>
+            <GoogleSignInButton clientId={googleClientId} nextPath={redirectTo} />
+          </div>
         )}
 
         <p className="mt-5 text-center text-xs text-ink-700/40">

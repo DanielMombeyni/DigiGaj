@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/auth'
 import { toman, faDigits } from '@/utils/format'
 import { mediaSrc } from '@/utils/media'
 import Seo from '@/components/common/Seo'
+import ProvinceCityFields from '@/components/account/ProvinceCityFields'
 
 const emptyAddressForm = {
   label: '',
@@ -668,24 +669,11 @@ export default function CheckoutPage() {
                       required
                     />
                   </label>
-                  <label className="block">
-                    <span className="label">استان *</span>
-                    <input
-                      className="input"
-                      value={addressForm.province}
-                      onChange={(e) => setAddressForm({ ...addressForm, province: e.target.value })}
-                      required
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="label">شهر *</span>
-                    <input
-                      className="input"
-                      value={addressForm.city}
-                      onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
-                      required
-                    />
-                  </label>
+                  <ProvinceCityFields
+                    province={addressForm.province}
+                    city={addressForm.city}
+                    onChange={(next) => setAddressForm({ ...addressForm, ...next })}
+                  />
                   <label className="block sm:col-span-2">
                     <span className="label">کد پستی *</span>
                     <input

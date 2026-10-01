@@ -16,6 +16,7 @@ from .profile import UserProfile
 from .customer_address import CustomerAddress, MAX_CUSTOMER_ADDRESSES
 from .sms_provider import SmsProviderConfig
 from .sms_template import SmsTemplate
+from .sms_log import SmsLog
 from .staff import StaffRole
 from .support import SupportTicket, TicketMessage
 from .email import EmailTemplate
@@ -42,6 +43,7 @@ __all__ = [
     "MAX_CUSTOMER_ADDRESSES",
     "SmsProviderConfig",
     "SmsTemplate",
+    "SmsLog",
     "StaffRole",
     "SupportTicket",
     "TicketMessage",

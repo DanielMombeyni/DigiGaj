@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpLeft, LayoutGrid } from 'lucide-react'
+import { ArrowUpLeft, ChevronDown, LayoutGrid } from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { mediaSrc } from '@/utils/media'
 import Seo from '@/components/common/Seo'
@@ -61,22 +61,90 @@ function SubCard({ category, index = 0 }) {
 
 function CategoriesSkeleton() {
   return (
-    <div className="space-y-10">
-      <div className="flex gap-2 overflow-hidden">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-10 w-28 shrink-0 animate-pulse rounded-full bg-mist-100" />
+    <div className="space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="h-[4.5rem] animate-pulse rounded-2xl bg-mist-100" />
+      ))}
+    </div>
+  )
+}
+
+function panelRef(open) {
+  return (node) => {
+    if (!node) return
+    if (open) node.removeAttribute('inert')
+    else node.setAttribute('inert', '')
+  }
+}
+
+function SubPanel({ items, childrenOf }) {
+  const [openId, setOpenId] = useState(null)
+  const leavesOnly = items.every((c) => (childrenOf.get(String(c.id)) || []).length === 0)
+
+  if (leavesOnly) {
+    return (
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+        {items.map((child, i) => (
+          <SubCard key={child.id} category={child} index={i} />
         ))}
       </div>
-      {Array.from({ length: 2 }).map((_, i) => (
-        <div key={i} className="space-y-4">
-          <div className="h-44 animate-pulse rounded-3xl bg-mist-100 sm:h-52" />
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, j) => (
-              <div key={j} className="aspect-[4/3] animate-pulse rounded-2xl bg-mist-100" />
-            ))}
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {items.map((child) => {
+        const kids = childrenOf.get(String(child.id)) || []
+        const open = openId === String(child.id)
+        if (kids.length === 0) {
+          return (
+            <Link
+              key={child.id}
+              to={`/products?category=${child.id}`}
+              className="group flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-xl border border-mist-200 bg-white px-3 py-2.5 outline-none transition hover:border-copper-400/40 focus-visible:ring-2 focus-visible:ring-copper-400"
+            >
+              <span className="min-w-0 truncate text-sm font-semibold text-ink-900 group-hover:text-copper-600">
+                {child.name}
+              </span>
+              <ArrowUpLeft className="h-3.5 w-3.5 shrink-0 text-ink-700/35 group-hover:text-copper-500" strokeWidth={2} aria-hidden />
+            </Link>
+          )
+        }
+        return (
+          <div key={child.id} className="overflow-hidden rounded-xl border border-mist-200 bg-white">
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-controls={`sub-${child.id}`}
+              onClick={() => setOpenId(open ? null : String(child.id))}
+              className="flex min-h-12 w-full cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-400"
+            >
+              <span className="min-w-0 truncate text-sm font-semibold text-ink-900">{child.name}</span>
+              <span className="inline-flex shrink-0 items-center gap-2 text-xs text-ink-700/45">
+                {faDigits(kids.length)} زیردسته
+                <ChevronDown
+                  className={cn('h-4 w-4 transition duration-200 motion-reduce:transition-none', open && 'rotate-180')}
+                  strokeWidth={2}
+                  aria-hidden
+                />
+              </span>
+            </button>
+            <div
+              id={`sub-${child.id}`}
+              className={cn(
+                'grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none',
+                open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+              )}
+            >
+              <div className="min-h-0 overflow-hidden" ref={panelRef(open)}>
+                <div className="border-t border-mist-100 px-3 py-3">
+                  <SubPanel items={kids} childrenOf={childrenOf} />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -84,7 +152,7 @@ function CategoriesSkeleton() {
 export default function CategoriesPage() {
   const [cats, setCats] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeRootId, setActiveRootId] = useState('all')
+  const [openId, setOpenId] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -124,12 +192,10 @@ export default function CategoriesPage() {
     return map
   }, [cats])
 
-  const visibleRoots = useMemo(() => {
-    if (activeRootId === 'all') return roots
-    return roots.filter((r) => String(r.id) === String(activeRootId))
-  }, [roots, activeRootId])
-
-  const subCount = cats.length - roots.length
+  const toggleRoot = (id) => {
+    const next = String(id)
+    setOpenId((current) => (current === next ? null : next))
+  }
 
   return (
     <div className="min-w-0 overflow-x-clip">
@@ -155,15 +221,15 @@ export default function CategoriesPage() {
             دسته‌بندی‌ها
           </h1>
           <p className="mt-3 max-w-lg text-sm leading-7 text-white/60 sm:text-base sm:leading-8">
-            از دسته اصلی شروع کنید یا مستقیم وارد زیردسته شوید.
+            از دسته اصلی شروع کنید؛ با هر کلیک زیردسته‌ها باز می‌شوند.
           </p>
           {!loading && cats.length > 0 && (
             <p className="mt-5 text-xs text-white/40">
               <span className="text-white/75">{faDigits(roots.length)}</span> دسته
-              {subCount > 0 ? (
+              {cats.length - roots.length > 0 ? (
                 <>
                   {' '}
-                  · <span className="text-white/75">{faDigits(subCount)}</span> زیردسته
+                  · <span className="text-white/75">{faDigits(cats.length - roots.length)}</span> زیردسته
                 </>
               ) : null}
             </p>
@@ -183,128 +249,96 @@ export default function CategoriesPage() {
           </div>
         ) : (
           <>
-            {/* Root filter — modern chip rail */}
-            <Reveal className="mb-8 sm:mb-10">
-              <div
-                role="tablist"
-                aria-label="فیلتر دسته اصلی"
-                className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeRootId === 'all'}
-                  onClick={() => setActiveRootId('all')}
-                  className={cn(
-                    'shrink-0 cursor-pointer rounded-full px-4 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400',
-                    activeRootId === 'all'
-                      ? 'bg-ink-900 text-white shadow-soft'
-                      : 'border border-mist-200 bg-white text-ink-800 hover:border-copper-400/40',
-                  )}
-                >
-                  همه دسته‌ها
-                </button>
-                {roots.map((root) => {
-                  const active = String(activeRootId) === String(root.id)
-                  const n = (childrenOf.get(String(root.id)) || []).length
-                  return (
-                    <button
-                      key={root.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      onClick={() => setActiveRootId(String(root.id))}
-                      className={cn(
-                        'inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-copper-400',
-                        active
-                          ? 'bg-ink-900 text-white shadow-soft'
-                          : 'border border-mist-200 bg-white text-ink-800 hover:border-copper-400/40',
-                      )}
-                    >
-                      {root.name}
-                      {n > 0 ? (
-                        <span
-                          className={cn(
-                            'rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums',
-                            active ? 'bg-white/15 text-white/80' : 'bg-mist-100 text-ink-700/55',
-                          )}
-                        >
-                          {faDigits(n)}
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
-            </Reveal>
-
-            <div className="space-y-12 sm:space-y-14">
-              {visibleRoots.map((root, rootIndex) => {
+            <div className="space-y-3">
+              {roots.map((root) => {
                 const subs = childrenOf.get(String(root.id)) || []
+                const open = openId === String(root.id)
+                const panelId = `cat-panel-${root.id}`
+
+                if (subs.length === 0) {
+                  return (
+                    <Link
+                      key={root.id}
+                      id={`cat-${root.id}`}
+                      to={`/products?category=${root.id}`}
+                      className="group flex min-h-16 cursor-pointer items-center gap-3 overflow-hidden rounded-2xl border border-mist-200 bg-white px-3 py-2.5 outline-none transition hover:border-copper-400/40 hover:shadow-soft focus-visible:ring-2 focus-visible:ring-copper-400 sm:gap-4 sm:px-4"
+                    >
+                      <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-ink-950">
+                        <MediaFill category={root} letterClass="text-lg" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-display text-base font-bold text-ink-900 group-hover:text-copper-600 sm:text-lg">
+                          {root.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-ink-700/45">
+                          {root.description || 'مشاهده محصولات این دسته'}
+                        </span>
+                      </span>
+                      <ArrowUpLeft className="h-4 w-4 shrink-0 text-ink-700/35 group-hover:text-copper-500" strokeWidth={2} aria-hidden />
+                    </Link>
+                  )
+                }
+
                 return (
-                  <Reveal key={root.id} delay={Math.min(rootIndex, 4) * 45} className="min-w-0">
-                    <div id={`cat-${root.id}`} className="scroll-mt-28 space-y-4 sm:space-y-5">
-                      {/* Parent category — featured banner */}
-                      <Link
-                        to={`/products?category=${root.id}`}
-                        className="group relative block min-h-[11rem] cursor-pointer overflow-hidden rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-copper-400 focus-visible:ring-offset-2 sm:min-h-[13rem]"
+                  <div
+                    key={root.id}
+                    id={`cat-${root.id}`}
+                    className={cn(
+                      'scroll-mt-28 overflow-hidden rounded-2xl border bg-white transition duration-200',
+                      open ? 'border-copper-400/40 shadow-soft' : 'border-mist-200',
+                    )}
+                  >
+                    <div className="flex items-stretch">
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        aria-controls={panelId}
+                        onClick={() => toggleRoot(root.id)}
+                        className="flex min-h-16 min-w-0 flex-1 cursor-pointer items-center gap-3 px-3 py-2.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-400 sm:gap-4 sm:px-4"
                       >
-                        <div className="absolute inset-0 bg-ink-950">
-                          <MediaFill category={root} letterClass="text-6xl sm:text-7xl" />
-                        </div>
-                        <div
-                          className="absolute inset-0 bg-gradient-to-t from-ink-950 via-ink-950/55 to-ink-950/15"
+                        <span className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-ink-950">
+                          <MediaFill category={root} letterClass="text-lg" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-display text-base font-bold text-ink-900 sm:text-lg">
+                            {root.name}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-ink-700/45">
+                            {faDigits(subs.length)} زیردسته
+                          </span>
+                        </span>
+                        <ChevronDown
+                          className={cn(
+                            'h-5 w-5 shrink-0 text-ink-700/45 transition duration-200 motion-reduce:transition-none',
+                            open && 'rotate-180 text-copper-500',
+                          )}
+                          strokeWidth={2}
                           aria-hidden
                         />
-                        <div className="relative flex h-full min-h-[11rem] flex-col justify-end p-5 sm:min-h-[13rem] sm:p-7 md:p-8">
-                          <div className="flex flex-wrap items-end justify-between gap-4">
-                            <div className="min-w-0 max-w-xl">
-                              <p className="text-[11px] font-semibold tracking-wide text-copper-400">
-                                دسته اصلی
-                                {subs.length > 0 ? (
-                                  <>
-                                    {' '}
-                                    · {faDigits(subs.length)} زیردسته
-                                  </>
-                                ) : null}
-                              </p>
-                              <h2 className="mt-1.5 font-display text-2xl font-bold text-white sm:text-3xl md:text-4xl">
-                                {root.name}
-                              </h2>
-                              {root.description ? (
-                                <p className="mt-2 line-clamp-2 text-sm leading-7 text-white/55">
-                                  {root.description}
-                                </p>
-                              ) : (
-                                <p className="mt-2 text-sm text-white/50">
-                                  مشاهده همه محصولات این دسته
-                                </p>
-                              )}
-                            </div>
-                            <span className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-copper-500 px-4 text-sm font-semibold text-white shadow-soft transition duration-300 group-hover:bg-copper-600">
-                              ورود به دسته
-                              <ArrowUpLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
-                            </span>
-                          </div>
-                        </div>
+                      </button>
+                      <Link
+                        to={`/products?category=${root.id}`}
+                        className="hidden shrink-0 items-center px-4 text-sm font-semibold text-copper-600 outline-none hover:text-copper-500 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-copper-400 sm:inline-flex"
+                      >
+                        محصولات
                       </Link>
-
-                      {/* Subcategories — equal visual grid */}
-                      {subs.length > 0 && (
-                        <div>
-                          <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
-                            <h3 className="text-sm font-semibold text-ink-800">زیردسته‌ها</h3>
-                            <span className="text-xs text-ink-700/40">{faDigits(subs.length)} مورد</span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 md:grid-cols-3 lg:grid-cols-4">
-                            {subs.map((child, i) => (
-                              <SubCard key={child.id} category={child} index={i} />
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </Reveal>
+                    <div
+                      id={panelId}
+                      role="region"
+                      aria-label={`زیردسته‌های ${root.name}`}
+                      className={cn(
+                        'grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none',
+                        open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+                      )}
+                    >
+                      <div className="min-h-0 overflow-hidden" ref={panelRef(open)}>
+                        <div className="border-t border-mist-100 bg-mist-50/70 px-3 py-3 sm:px-4 sm:py-4">
+                          <SubPanel items={subs} childrenOf={childrenOf} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )
               })}
             </div>

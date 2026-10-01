@@ -463,27 +463,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Trust / benefits */}
-      <section className="relative z-10 -mt-8 px-4">
-        <Reveal className="reveal-scope mx-auto grid max-w-6xl gap-3 rounded-3xl border border-mist-200/80 bg-white/90 p-3 shadow-soft backdrop-blur sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:p-2">
-          {BENEFITS.map((b, i) => (
-            <div
-              key={b.title}
-              className="reveal flex gap-3 rounded-2xl px-4 py-5 transition hover:bg-mist-50"
-              style={{ transitionDelay: `${i * 80}ms` }}
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-copper-400">
-                {b.icon}
-              </div>
-              <div>
-                <div className="font-semibold text-ink-900">{b.title}</div>
-                <p className="mt-1 text-xs leading-6 text-ink-700/60">{b.text}</p>
-              </div>
-            </div>
-          ))}
-        </Reveal>
-      </section>
-
       {/* Featured */}
       <section className="mx-auto max-w-6xl px-4 py-16 md:py-20">
         <Reveal className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -561,7 +540,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA band */}
-      <section className="px-4 pb-20">
+      <section className="px-4">
         <Reveal className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-gradient-to-l from-ink-950 via-ink-900 to-sea-600 px-8 py-14 text-white md:px-14">
           <div className="absolute -left-10 top-0 h-56 w-56 rounded-full bg-copper-400/20 blur-3xl animate-orb" aria-hidden />
           <div className="relative max-w-xl">
@@ -574,6 +553,27 @@ export default function HomePage() {
               <Link to="/contact" className="btn-ghost cursor-pointer">مشاوره بگیرید</Link>
             </div>
           </div>
+        </Reveal>
+      </section>
+
+      {/* Trust / benefits */}
+      <section className="px-4 pb-20 pt-6">
+        <Reveal className="reveal-scope mx-auto grid max-w-6xl gap-3 rounded-3xl border border-mist-200/80 bg-white p-3 shadow-soft sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:p-2">
+          {BENEFITS.map((b, i) => (
+            <div
+              key={b.title}
+              className="reveal flex gap-3 rounded-2xl px-4 py-5 transition hover:bg-mist-50"
+              style={{ transitionDelay: `${i * 80}ms` }}
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-copper-400">
+                {b.icon}
+              </div>
+              <div>
+                <div className="font-semibold text-ink-900">{b.title}</div>
+                <p className="mt-1 text-xs leading-6 text-ink-700/60">{b.text}</p>
+              </div>
+            </div>
+          ))}
         </Reveal>
       </section>
     </div>

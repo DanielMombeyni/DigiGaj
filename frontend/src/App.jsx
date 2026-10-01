@@ -22,6 +22,7 @@ const LoginPage = lazy(() => import('@/pages/shop/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/shop/RegisterPage'))
 const ForgotPasswordPage = lazy(() => import('@/pages/shop/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/pages/shop/ResetPasswordPage'))
+const GoogleCallbackPage = lazy(() => import('@/pages/shop/GoogleCallbackPage'))
 
 const AdminLoginPage = lazy(() => import('@/pages/admin/AdminLoginPage'))
 const AdminDashboard = lazy(() => import('@/pages/admin/DashboardPage'))
@@ -69,6 +70,7 @@ export default function App() {
         <Routes>
           <Route path="login" element={guard('login', <LoginPage />)} />
           <Route path="register" element={guard('register', <RegisterPage />)} />
+          <Route path="login/google/callback" element={<GoogleCallbackPage />} />
           <Route path="forgot-password" element={<ForgotPasswordPage />} />
           <Route path="reset-password/:uid/:token" element={<ResetPasswordPage />} />
 

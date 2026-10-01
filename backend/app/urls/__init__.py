@@ -18,7 +18,8 @@ from app.views.shop import (
     storefront_config,
     storefront_home,
 )
-from app.views.auth_otp import request_otp, verify_otp
+from app.views.auth_otp import confirm_password_otp, request_otp, request_password_otp, verify_otp
+from app.views.google_auth import complete_google_profile, google_login, set_phone
 from app.views.sms_views import (
     AdminSmsCatalogView,
     AdminSmsProviderDetailView,
@@ -31,7 +32,9 @@ from app.views.sms_panel_views import (
     AdminSmsSendView,
     AdminSmsTemplateDetailView,
     AdminSmsTemplateListView,
+    AdminSmsTemplatePreviewView,
     AdminSmsTemplateTestView,
+    AdminSmsLogListView,
 )
 from app.views.email_views import (
     AdminEmailSmtpTestView,
@@ -99,7 +102,13 @@ urlpatterns = [
     path("admin/sms/catalog/", AdminSmsPanelCatalogView.as_view(), name="admin-sms-panel-catalog"),
     path("admin/sms/balance/", AdminSmsBalanceView.as_view(), name="admin-sms-balance"),
     path("admin/sms/send/", AdminSmsSendView.as_view(), name="admin-sms-send"),
+    path("admin/sms/logs/", AdminSmsLogListView.as_view(), name="admin-sms-logs"),
     path("admin/sms-templates/", AdminSmsTemplateListView.as_view(), name="admin-sms-templates"),
+    path(
+        "admin/sms-templates/<int:pk>/preview/",
+        AdminSmsTemplatePreviewView.as_view(),
+        name="admin-sms-template-preview",
+    ),
     path(
         "admin/sms-templates/<int:pk>/test/",
         AdminSmsTemplateTestView.as_view(),
@@ -130,6 +139,11 @@ urlpatterns = [
     ),
     path("auth/otp/request/", request_otp, name="otp-request"),
     path("auth/otp/verify/", verify_otp, name="otp-verify"),
+    path("auth/password/otp/request/", request_password_otp, name="password-otp-request"),
+    path("auth/password/otp/confirm/", confirm_password_otp, name="password-otp-confirm"),
+    path("auth/google/", google_login, name="google-login"),
+    path("me/phone/", set_phone, name="me-phone"),
+    path("me/google-profile/", complete_google_profile, name="me-google-profile"),
     path("payment/", include(payment_urls)),
     path("me/profile/", customer_profile, name="me-profile"),
     path("me/", include(me_router.urls)),

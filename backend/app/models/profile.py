@@ -7,7 +7,14 @@ class UserProfile(TimeStampedModel):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, related_name="profile", on_delete=models.CASCADE
     )
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=20, blank=True, db_index=True)
+    google_sub = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="شناسه گوگل",
+    )
     national_id = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)

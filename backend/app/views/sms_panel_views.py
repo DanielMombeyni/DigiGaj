@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError
 
-from app.models import SmsTemplate
+from app.models import SmsLog, SmsTemplate
 from app.permissions import HasAdminPage
 from app.sms.signal.exceptions import SignalSmsError
 from app.services.sms_templates import (
@@ -12,6 +12,7 @@ from app.services.sms_templates import (
     delete_template,
     fetch_balance,
     list_templates,
+    preview_template,
     send_quick,
     send_template_test,
     serialize_template,
@@ -135,3 +136,52 @@ class AdminSmsTemplateTestView(APIView):
         except (ValidationError, SignalSmsError) as exc:
             return _error(exc)
         return Response({"detail": "پیامک آزمایشی ارسال شد.", **result})
+
+
+class AdminSmsTemplatePreviewView(APIView):
+    permission_classes = [HasAdminPage]
+    required_admin_page = "sms"
+
+    def post(self, request, pk):
+        try:
+            row = SmsTemplate.objects.get(pk=pk)
+        except SmsTemplate.DoesNotExist:
+            return Response({"detail": "یافت نشد"}, status=404)
+        data = request.data if isinstance(request.data, dict) else {}
+        params = data.get("parameters") if isinstance(data.get("parameters"), dict) else {}
+        return Response(preview_template(row, params))
+
+
+class AdminSmsLogListView(APIView):
+    permission_classes = [HasAdminPage]
+    required_admin_page = "sms"
+
+    def get(self, request):
+        try:
+            page = max(1, int(request.query_params.get("page") or 1))
+        except (TypeError, ValueError):
+            page = 1
+        page_size = 50
+        qs = SmsLog.objects.order_by("-created_at")
+        total = qs.count()
+        start = (page - 1) * page_size
+        rows = qs[start : start + page_size]
+        return Response(
+            {
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+                "results": [
+                    {
+                        "id": row.id,
+                        "phone": row.phone,
+                        "event": row.event,
+                        "status": row.status,
+                        "status_label": row.get_status_display(),
+                        "error": row.error,
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                    }
+                    for row in rows
+                ],
+            }
+        )

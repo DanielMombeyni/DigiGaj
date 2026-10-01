@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { MessageSquare, RefreshCw, Send, Settings2, FileText } from 'lucide-react'
+import { MessageSquare, RefreshCw, Send, Settings2, FileText, ScrollText } from 'lucide-react'
 import { adminApi } from '@/services/api'
 import { useConfirm } from '@/components/common/ConfirmProvider'
 import {
@@ -16,6 +16,8 @@ import { faDigits } from '@/utils/format'
 function emptyForm(mode = 'text') {
   return {
     name: '',
+    event: 'custom',
+    target_user: 'customer',
     mode,
     body_text: '',
     pattern_id: '',
@@ -24,6 +26,16 @@ function emptyForm(mode = 'text') {
     notes: '',
     is_enabled: true,
   }
+}
+
+function renderPreview(body, context) {
+  return String(body || '').replace(
+    /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\{([a-zA-Z0-9_]+)\}/g,
+    (match, a, b) => {
+      const key = a || b
+      return context?.[key] != null && context[key] !== '' ? String(context[key]) : match
+    },
+  )
 }
 
 function firstError(data) {
@@ -50,20 +62,43 @@ function insertAtCursor(el, value, token, setter) {
   })
 }
 
-function formatBalance(balance) {
-  if (balance == null) return null
-  if (typeof balance === 'number' || typeof balance === 'string') return String(balance)
-  if (typeof balance === 'object') {
-    for (const key of ['credit', 'balance', 'amount', 'value', 'remaining']) {
-      if (balance[key] != null) return String(balance[key])
+function creditValue(balance, depth = 0) {
+  if (balance == null || depth > 4) return null
+  if (typeof balance === 'number') return balance
+  if (typeof balance === 'string') {
+    const text = balance.trim()
+    if (!text) return null
+    if (text.startsWith('{') || text.startsWith('[')) {
+      try {
+        return creditValue(JSON.parse(text), depth + 1)
+      } catch {
+        return text
+      }
     }
-    try {
-      return JSON.stringify(balance)
-    } catch {
-      return '—'
+    return text
+  }
+  if (typeof balance === 'object') {
+    if (balance.data != null) {
+      const nested = creditValue(balance.data, depth + 1)
+      if (nested != null) return nested
+    }
+    for (const key of ['credit', 'balance', 'amount', 'value', 'remaining']) {
+      if (balance[key] == null) continue
+      const nested = creditValue(balance[key], depth + 1)
+      if (nested != null) return nested
     }
   }
-  return '—'
+  return null
+}
+
+function formatBalance(balance) {
+  const value = creditValue(balance)
+  if (value == null || value === '') return null
+  const numeric = typeof value === 'number' ? value : Number(String(value).replace(/,/g, ''))
+  if (Number.isFinite(numeric)) {
+    return new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 2 }).format(numeric)
+  }
+  return String(value)
 }
 
 function parsePhones(raw) {
@@ -117,7 +152,7 @@ function ParamFields({ keys, values, onChange }) {
 export default function AdminSmsPage() {
   const confirm = useConfirm()
   const bodyRef = useRef(null)
-  const [panel, setPanel] = useState('send') // send | templates
+  const [panel, setPanel] = useState('send') // send | templates | logs
   const [items, setItems] = useState([])
   const [catalog, setCatalog] = useState({
     placeholders: [],
@@ -135,6 +170,8 @@ export default function AdminSmsPage() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm())
   const [busy, setBusy] = useState(false)
+  const [logs, setLogs] = useState([])
+  const [logsLoading, setLogsLoading] = useState(false)
 
   const [sendMode, setSendMode] = useState('text')
   const [sendPhones, setSendPhones] = useState('')
@@ -178,6 +215,22 @@ export default function AdminSmsPage() {
     load()
   }, [])
 
+  const loadLogs = async () => {
+    setLogsLoading(true)
+    try {
+      const { data } = await adminApi.sms.logs({ page: 1 })
+      setLogs(data.results || [])
+    } catch {
+      setError('خطا در بارگذاری گزارش پیامک')
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (panel === 'logs') loadLogs()
+  }, [panel])
+
   const enabledTemplates = useMemo(
     () => items.filter((t) => t.is_enabled !== false),
     [items],
@@ -194,6 +247,28 @@ export default function AdminSmsPage() {
       { key: 'pattern', label: 'الگوی سیگنال' },
     ]
   }, [catalog.modes])
+
+  const eventOptions = useMemo(() => {
+    if (catalog.events?.length) return catalog.events
+    return [
+      { key: 'login_otp', label: 'کد ورود' },
+      { key: 'forgot_password', label: 'بازیابی رمز' },
+      { key: 'order_status_changed', label: 'تغییر وضعیت سفارش' },
+      { key: 'custom', label: 'سفارشی' },
+    ]
+  }, [catalog.events])
+
+  const targetOptions = useMemo(() => {
+    if (catalog.targets?.length) return catalog.targets
+    return [
+      { key: 'customer', label: 'مشتری' },
+      { key: 'admin', label: 'ادمین' },
+      { key: 'all', label: 'همه' },
+    ]
+  }, [catalog.targets])
+
+  const previewContext = catalog.samples?.[form.event] || {}
+  const previewText = renderPreview(form.body_text, previewContext)
 
   const refreshBalance = async () => {
     setError('')
@@ -242,6 +317,8 @@ export default function AdminSmsPage() {
     setEditing(row)
     setForm({
       name: row.name || '',
+      event: row.event || 'custom',
+      target_user: row.target_user || 'customer',
       mode: row.mode || 'text',
       body_text: row.body_text || '',
       pattern_id: row.pattern_id != null ? String(row.pattern_id) : '',
@@ -271,6 +348,8 @@ export default function AdminSmsPage() {
       }
       const payload = {
         name: form.name.trim(),
+        event: form.event,
+        target_user: form.target_user,
         mode: form.mode,
         body_text: form.body_text,
         pattern_id: form.mode === 'pattern' ? form.pattern_id : null,
@@ -469,6 +548,16 @@ export default function AdminSmsPage() {
           قالب‌ها
           <span className="tabular-nums text-ink-700/40">({faDigits(items.length)})</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setPanel('logs')}
+          className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition ${
+            panel === 'logs' ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-700/55 hover:text-ink-900'
+          }`}
+        >
+          <ScrollText className="h-4 w-4" strokeWidth={1.85} />
+          گزارش
+        </button>
       </div>
 
       {panel === 'send' ? (
@@ -627,7 +716,7 @@ export default function AdminSmsPage() {
             </div>
           </form>
         </section>
-      ) : (
+      ) : panel === 'templates' ? (
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm text-ink-700/70">
@@ -657,7 +746,7 @@ export default function AdminSmsPage() {
               </button>
             </div>
           ) : (
-            <AdminTable columns={['قالب', 'نوع', 'وضعیت', '']} emptyMessage="قالبی وجود ندارد">
+            <AdminTable columns={['قالب', 'رویداد', 'مخاطب', 'نوع', 'وضعیت', '']} emptyMessage="قالبی وجود ندارد">
               {rows.map((row) => (
                 <tr key={row.id} className="border-t border-mist-100 hover:bg-mist-50/80">
                   <td className="px-4 py-3">
@@ -673,6 +762,8 @@ export default function AdminSmsPage() {
                       <div className="mt-0.5 text-[11px] text-ink-700/35">{row.notes}</div>
                     ) : null}
                   </td>
+                  <td className="px-4 py-3 text-sm text-ink-700/70">{row.event_label || row.event || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-ink-700/70">{row.target_label || row.target_user || '—'}</td>
                   <td className="px-4 py-3 text-sm text-ink-700/70">{row.mode_label}</td>
                   <td className="px-4 py-3">
                     <button
@@ -725,7 +816,33 @@ export default function AdminSmsPage() {
             </AdminTable>
           )}
         </section>
-      )}
+      ) : panel === 'logs' ? (
+        <section className="space-y-4">
+          {logsLoading ? (
+            <div className="h-48 animate-pulse rounded-2xl bg-surface" />
+          ) : logs.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-mist-200 bg-white px-6 py-12 text-center text-sm text-ink-700/50">
+              هنوز گزارشی ثبت نشده است.
+            </div>
+          ) : (
+            <AdminTable columns={['زمان', 'شماره', 'رویداد', 'وضعیت', 'خطا']} emptyMessage="گزارشی نیست">
+              {logs.map((row) => (
+                <tr key={row.id} className="border-t border-mist-100">
+                  <td className="px-4 py-3 text-xs text-ink-700/60" dir="ltr">
+                    {row.created_at ? row.created_at.replace('T', ' ').slice(0, 19) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-sm" dir="ltr">
+                    {row.phone}
+                  </td>
+                  <td className="px-4 py-3 text-sm">{row.event}</td>
+                  <td className="px-4 py-3 text-sm">{row.status_label || row.status}</td>
+                  <td className="px-4 py-3 text-xs text-red-700">{row.error || '—'}</td>
+                </tr>
+              ))}
+            </AdminTable>
+          )}
+        </section>
+      ) : null}
 
       <AdminModal
         open={open}
@@ -754,6 +871,39 @@ export default function AdminSmsPage() {
               placeholder="مثلاً کد تأیید ورود"
             />
           </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="label">رویداد</span>
+              <select
+                className="input"
+                value={form.event}
+                onChange={(e) => setForm({ ...form, event: e.target.value })}
+              >
+                {eventOptions.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="label">مخاطب</span>
+              <select
+                className="input"
+                value={form.target_user}
+                onChange={(e) => setForm({ ...form, target_user: e.target.value })}
+              >
+                {targetOptions.map((item) => (
+                  <option key={item.key} value={item.key}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="text-xs text-ink-700/45">
+            برای هر رویداد فقط یک قالب فعال به‌ازای هر مخاطب می‌ماند. فعال کردن این قالب، قالب قبلی همان رویداد و مخاطب را خاموش می‌کند.
+          </p>
           <label className="block">
             <span className="label">نوع</span>
             <select
@@ -797,6 +947,12 @@ export default function AdminSmsPage() {
                   required={form.mode === 'text'}
                 />
               </label>
+              {previewText && (
+                <div className="rounded-xl border border-mist-200 bg-mist-50 px-3 py-2">
+                  <div className="mb-1 text-xs font-medium text-ink-700/50">پیش‌نمایش با داده نمونه</div>
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-ink-900">{previewText}</p>
+                </div>
+              )}
             </>
           ) : (
             <>

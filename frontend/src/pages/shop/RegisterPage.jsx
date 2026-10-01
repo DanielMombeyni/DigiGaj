@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
-import { authApi } from '@/services/api'
+import { authApi, shopApi } from '@/services/api'
 import { useAuthStore } from '@/store/auth'
 import { brand } from '@/config/brand'
 import Seo from '@/components/common/Seo'
 import AuthShell, { AuthError, formatAuthError } from '@/components/auth/AuthShell'
+import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 
 export default function RegisterPage() {
   const applySession = useAuthStore((s) => s.applySession)
@@ -20,8 +21,22 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [googleClientId, setGoogleClientId] = useState('')
 
-  const onChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
+  useEffect(() => {
+    shopApi
+      .config()
+      .then((r) => {
+        setGoogleClientId(r.data.google_login?.enabled ? r.data.google_login.client_id || '' : '')
+      })
+      .catch(() => {})
+  }, [])
+
+  const onChange = (e) => {
+    const value =
+      e.target.name === 'username' ? e.target.value.replace(/\s+/g, '') : e.target.value
+    setForm((f) => ({ ...f, [e.target.name]: value }))
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -37,7 +52,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { data } = await authApi.register({
-        username: form.username.trim(),
+        username: form.username.replace(/\s+/g, ''),
         email: form.email.trim(),
         password1: form.password1,
         password2: form.password2,
@@ -47,7 +62,7 @@ export default function RegisterPage() {
       if (access) {
         await applySession({ access, refresh, user: data.user })
       } else {
-        await login(form.username.trim(), form.password1)
+        await login(form.username.replace(/\s+/g, ''), form.password1)
       }
       navigate('/', { replace: true })
     } catch (err) {
@@ -141,6 +156,17 @@ export default function RegisterPage() {
             {loading ? 'در حال ثبت‌نام...' : 'ثبت‌نام و ورود'}
           </button>
         </form>
+
+        {googleClientId && (
+          <div className="mt-5 space-y-3">
+            <div className="flex items-center gap-3 text-[11px] text-ink-700/40">
+              <span className="h-px flex-1 bg-mist-200" />
+              یا
+              <span className="h-px flex-1 bg-mist-200" />
+            </div>
+            <GoogleSignInButton clientId={googleClientId} label="ثبت‌نام با گوگل" />
+          </div>
+        )}
 
         <p className="mt-4 text-[11px] leading-5 text-ink-700/40">
           با ثبت‌نام، شرایط استفاده از فروشگاه را می‌پذیرید.

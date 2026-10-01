@@ -2,6 +2,10 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model  # noqa: F401
 from config.settings.components.base import env
 
+# Fallback only. Admin settings override these when both fields are filled there.
+GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", default="").strip()
+GOOGLE_OAUTH_CLIENT_SECRET = env("GOOGLE_OAUTH_CLIENT_SECRET", default="").strip()
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -34,6 +38,7 @@ REST_AUTH = {
     "USE_JWT": True,
     "JWT_AUTH_HTTPONLY": False,
     "SESSION_LOGIN": False,
+    "REGISTER_SERIALIZER": "app.serializers.user.RegisterSerializer",
     "USER_DETAILS_SERIALIZER": "app.serializers.user.UserSerializer",
     "PASSWORD_RESET_SERIALIZER": "app.serializers.password_reset.FrontendPasswordResetSerializer",
 }

@@ -19,15 +19,41 @@ from app.sms.signal.exceptions import SignalSmsConfigError, SignalSmsError
 logger = logging.getLogger("app.sms")
 
 PLACEHOLDERS = [
+    {"key": "name", "label": "نام"},
+    {"key": "order_id", "label": "شناسه سفارش"},
+    {"key": "status", "label": "وضعیت"},
+    {"key": "code", "label": "کد"},
+    {"key": "link", "label": "لینک"},
     {"key": "customer_name", "label": "نام مشتری"},
     {"key": "phone", "label": "شماره موبایل"},
     {"key": "order_number", "label": "شماره سفارش"},
-    {"key": "code", "label": "کد تأیید"},
     {"key": "amount", "label": "مبلغ"},
-    {"key": "status", "label": "وضعیت"},
 ]
 
-_TOKEN_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
+_TOKEN_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\{([a-zA-Z0-9_]+)\}")
+
+SAMPLE_BY_EVENT = {
+    "login_otp": {"code": "123456", "name": "علی رضایی", "phone": "09120000000"},
+    "forgot_password": {
+        "name": "علی رضایی",
+        "link": "https://example.com/reset-password/sample",
+        "code": "sample-token",
+        "phone": "09120000000",
+    },
+    "order_status_changed": {
+        "order_id": "GS-1001",
+        "status": "ارسال‌شده",
+        "name": "علی رضایی",
+        "phone": "09120000000",
+    },
+    "custom": {"name": "علی رضایی", "code": "123456", "phone": "09120000000"},
+}
+
+EVENT_TARGETS = {
+    "login_otp": ("customer", "all"),
+    "forgot_password": ("customer", "admin", "all"),
+    "order_status_changed": ("customer", "admin", "all"),
+}
 
 
 def get_signal_client() -> SignalSmsService:
@@ -67,6 +93,10 @@ def serialize_template(row: SmsTemplate) -> dict:
         "id": row.id,
         "key": row.key,
         "name": row.name,
+        "event": row.event,
+        "event_label": row.get_event_display(),
+        "target_user": row.target_user,
+        "target_label": row.get_target_user_display(),
         "mode": row.mode,
         "mode_label": row.get_mode_display(),
         "body_text": row.body_text,
@@ -99,6 +129,9 @@ def catalog_payload() -> dict:
     return {
         "placeholders": list(PLACEHOLDERS),
         "modes": [{"key": k, "label": v} for k, v in SmsTemplate.Mode.choices],
+        "events": [{"key": k, "label": v} for k, v in SmsTemplate.Event.choices],
+        "targets": [{"key": k, "label": v} for k, v in SmsTemplate.Target.choices],
+        "samples": SAMPLE_BY_EVENT,
         "signal_ready": ready,
         "balance": balance,
         "balance_error": balance_error,
@@ -172,20 +205,35 @@ def create_template(payload: dict) -> SmsTemplate:
         raise ValidationError({"name": "نام قالب الزامی است."})
     mode = str(payload.get("mode") or SmsTemplate.Mode.TEXT).strip()
     body, pattern_id, param_keys, sample_params = _validate_mode_payload(mode, payload)
+    event = _parse_choice(
+        payload.get("event"), SmsTemplate.Event, "event", SmsTemplate.Event.CUSTOM
+    )
+    target = _parse_choice(
+        payload.get("target_user"),
+        SmsTemplate.Target,
+        "target_user",
+        SmsTemplate.Target.CUSTOMER,
+    )
 
     row = SmsTemplate(
         key=_unique_key(name),
         name=name[:160],
+        event=event,
+        target_user=target,
         mode=mode,
-        body_text=body,
+        body_text=_clean_text(body),
         pattern_id=pattern_id,
         param_keys=param_keys,
         sample_params=sample_params,
-        notes=str(payload.get("notes") or "").strip()[:255],
+        notes=_clean_text(payload.get("notes") or "", limit=255),
         is_enabled=bool(payload.get("is_enabled", True)),
         sort_order=SmsTemplate.objects.count(),
     )
-    row.save()
+    from django.db import transaction
+
+    with transaction.atomic():
+        _enforce_single_active(row)
+        row.save()
     return row
 
 
@@ -200,7 +248,15 @@ def update_template(row: SmsTemplate, payload: dict) -> SmsTemplate:
         row.name = name[:160]
 
     if "notes" in payload and payload["notes"] is not None:
-        row.notes = str(payload["notes"]).strip()[:255]
+        row.notes = _clean_text(payload["notes"], limit=255)
+
+    if "event" in payload and payload["event"] is not None:
+        row.event = _parse_choice(payload["event"], SmsTemplate.Event, "event", row.event)
+
+    if "target_user" in payload and payload["target_user"] is not None:
+        row.target_user = _parse_choice(
+            payload["target_user"], SmsTemplate.Target, "target_user", row.target_user
+        )
 
     if "is_enabled" in payload and payload["is_enabled"] is not None:
         row.is_enabled = bool(payload["is_enabled"])
@@ -223,7 +279,11 @@ def update_template(row: SmsTemplate, payload: dict) -> SmsTemplate:
         row.param_keys = param_keys
         row.sample_params = sample_params
 
-    row.save()
+    from django.db import transaction
+
+    with transaction.atomic():
+        _enforce_single_active(row)
+        row.save()
     return row
 
 
@@ -233,12 +293,54 @@ def delete_template(row: SmsTemplate) -> None:
 
 def render_text(template: str, context: dict[str, Any]) -> str:
     def repl(match: re.Match) -> str:
-        key = match.group(1)
+        key = match.group(1) or match.group(2)
         if key in context and context[key] is not None:
-            return str(context[key])
+            return _clean_text(context[key], limit=300)
         return match.group(0)
 
     return _TOKEN_RE.sub(repl, template or "")
+
+
+def _clean_text(value: Any, limit: int = 700) -> str:
+    text = str(value or "").replace("\x00", "")
+    return text[:limit]
+
+
+def sample_context(event: str) -> dict[str, str]:
+    base = dict(SAMPLE_BY_EVENT.get(event) or SAMPLE_BY_EVENT["custom"])
+    return {k: str(v) for k, v in base.items()}
+
+
+def preview_template(row: SmsTemplate, params: dict | None = None) -> dict:
+    merged = {**sample_context(row.event), **dict(row.sample_params or {}), **(params or {})}
+    if row.mode == SmsTemplate.Mode.PATTERN:
+        keys = list(row.param_keys or []) or list(merged.keys())
+        rendered = " ".join(f"{key}={merged.get(key, '')}" for key in keys)
+    else:
+        rendered = render_text(row.body_text, merged)
+    return {"text": rendered, "context": {k: str(v) for k, v in merged.items()}}
+
+
+def _parse_choice(raw, choices, field: str, default: str) -> str:
+    value = str(raw or default).strip()
+    valid = {c.value for c in choices}
+    if value not in valid:
+        raise ValidationError({field: "مقدار نامعتبر است."})
+    return value
+
+
+def _enforce_single_active(row: SmsTemplate) -> None:
+    if not row.is_enabled or row.event == SmsTemplate.Event.CUSTOM:
+        return
+    (
+        SmsTemplate.objects.filter(
+            event=row.event,
+            target_user=row.target_user,
+            is_enabled=True,
+        )
+        .exclude(pk=row.pk)
+        .update(is_enabled=False)
+    )
 
 
 def _normalize_phones(raw: Any) -> list[str]:

@@ -8,6 +8,7 @@ Auth: Authorization: Bearer <API-KEY>
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Sequence
 
@@ -48,6 +49,37 @@ _BALANCE_HINTS = (
     "ناکافی",
     "کمبود",
 )
+
+
+def credit_amount(payload: Any) -> Any:
+    """Read the account credit from Signal's {success, data: {credit}} body."""
+    if payload is None or isinstance(payload, bool):
+        return None
+    if isinstance(payload, (int, float)):
+        return payload
+    if isinstance(payload, str):
+        text = payload.strip()
+        if not text:
+            return None
+        if text[:1] in "{[":
+            try:
+                return credit_amount(json.loads(text))
+            except ValueError:
+                return text
+        return text
+    if isinstance(payload, dict):
+        data = payload.get("data")
+        if isinstance(data, (dict, str, int, float)) and data is not payload:
+            nested = credit_amount(data)
+            if nested is not None and not isinstance(nested, dict):
+                return nested
+        for key in ("credit", "balance", "amount", "value", "remaining"):
+            if key not in payload:
+                continue
+            nested = credit_amount(payload[key])
+            if nested is not None and not isinstance(nested, dict):
+                return nested
+    return None
 
 
 def _message_from_payload(payload: Any) -> str:
@@ -290,9 +322,11 @@ class SignalSmsService:
             params={"page": page_num},
         )
 
-    def check_balance(self) -> dict:
-        """GET /api_v1/user/credit — account credit / balance."""
-        return self._request("GET", "/api_v1/user/credit")
+    def check_balance(self) -> Any:
+        """GET /api_v1/user/credit — numeric credit when Signal wraps it in data."""
+        payload = self._request("GET", "/api_v1/user/credit")
+        amount = credit_amount(payload)
+        return payload if amount is None else amount
 
     def send_pattern(
         self,

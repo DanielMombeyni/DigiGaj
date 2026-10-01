@@ -69,6 +69,29 @@ export const useAuthStore = create((set) => ({
     }
   },
 
+  async loginWithGoogle(payload) {
+    set({ loading: true })
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    try {
+      const { data } = await authApi.google(payload)
+      const access = data.access
+      const refresh = data.refresh
+      if (!access) throw new Error('No access token')
+      persistTokens(access, refresh)
+      const user = data.user
+      if (user) set({ user, loading: false, booting: false })
+      else {
+        const me = await authApi.me()
+        set({ user: me.data, loading: false, booting: false })
+      }
+      return data
+    } catch (e) {
+      set({ loading: false })
+      throw e
+    }
+  },
+
   async fetchMe() {
     if (!localStorage.getItem('access_token')) {
       set({ user: null, booting: false })

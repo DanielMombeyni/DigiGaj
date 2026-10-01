@@ -8,8 +8,33 @@ class SmsTemplate(TimeStampedModel):
         TEXT = "text", "متن آزاد"
         PATTERN = "pattern", "الگوی سیگنال"
 
+    class Event(models.TextChoices):
+        LOGIN_OTP = "login_otp", "کد ورود"
+        FORGOT_PASSWORD = "forgot_password", "بازیابی رمز"
+        ORDER_STATUS_CHANGED = "order_status_changed", "تغییر وضعیت سفارش"
+        CUSTOM = "custom", "سفارشی"
+
+    class Target(models.TextChoices):
+        CUSTOMER = "customer", "مشتری"
+        ADMIN = "admin", "ادمین"
+        ALL = "all", "همه"
+
     key = models.SlugField(max_length=80, unique=True)
-    name = models.CharField(max_length=160)
+    name = models.CharField(max_length=160, verbose_name="عنوان")
+    event = models.CharField(
+        max_length=40,
+        choices=Event.choices,
+        default=Event.CUSTOM,
+        db_index=True,
+        verbose_name="رویداد",
+    )
+    target_user = models.CharField(
+        max_length=16,
+        choices=Target.choices,
+        default=Target.CUSTOMER,
+        db_index=True,
+        verbose_name="مخاطب",
+    )
     mode = models.CharField(
         max_length=16, choices=Mode.choices, default=Mode.TEXT, db_index=True
     )
@@ -36,6 +61,17 @@ class SmsTemplate(TimeStampedModel):
         verbose_name_plural = "قالب‌های پیامک"
         indexes = [
             models.Index(fields=["mode", "is_enabled"], name="app_sms_tpl_mode_en_idx"),
+            models.Index(
+                fields=["event", "target_user", "is_enabled"],
+                name="app_sms_tpl_evt_tgt_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "target_user"],
+                condition=models.Q(is_enabled=True) & ~models.Q(event="custom"),
+                name="uniq_sms_event_target_enabled",
+            ),
         ]
 
     def __str__(self):

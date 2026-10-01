@@ -1,3 +1,5 @@
+import re
+
 from django.contrib.auth import get_user_model
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -23,7 +25,7 @@ def _looks_like_phone(value: str) -> bool:
 
 class EmailOrUsernameTokenSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        login = (attrs.get("username") or "").strip()
+        login = re.sub(r"\s+", " ", (attrs.get("username") or "")).strip()
         methods = get_storefront_config()["auth_methods"]
 
         if "@" in login:
@@ -53,6 +55,7 @@ class EmailOrUsernameTokenSerializer(TokenObtainPairSerializer):
         else:
             if not methods.get("username_password"):
                 raise AuthenticationFailed("ورود با نام کاربری فعال نیست.")
+            attrs["username"] = re.sub(r"\s+", "", login)
 
         return super().validate(attrs)
 

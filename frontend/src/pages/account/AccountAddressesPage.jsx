@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { accountApi } from '@/services/api'
 import { AccountCard, EmptyState } from '@/components/account/AccountUI'
+import ProvinceCityFields from '@/components/account/ProvinceCityFields'
 
 const emptyForm = {
   label: '',
@@ -121,14 +122,11 @@ export default function AccountAddressesPage() {
               <span className="label">آدرس کامل *</span>
               <textarea className="input min-h-24 resize-y" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} required />
             </label>
-            <label className="block">
-              <span className="label">استان *</span>
-              <input className="input" value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} required />
-            </label>
-            <label className="block">
-              <span className="label">شهر *</span>
-              <input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} required />
-            </label>
+            <ProvinceCityFields
+              province={form.province}
+              city={form.city}
+              onChange={(next) => setForm({ ...form, ...next })}
+            />
             <label className="block sm:col-span-2">
               <span className="label">کد پستی *</span>
               <input

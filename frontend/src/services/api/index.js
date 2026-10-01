@@ -20,6 +20,8 @@ export const accountApi = {
   profile: {
     get: () => api.get('/me/profile/'),
     update: (data) => api.patch('/me/profile/', data),
+    setPhone: (phone) => api.post('/me/phone/', { phone }),
+    completeGoogle: (data) => api.post('/me/google-profile/', data),
   },
   addresses: {
     list: (params) => api.get('/me/addresses/', { params }),
@@ -143,12 +145,14 @@ export const adminApi = {
     catalog: () => api.get('/admin/sms/catalog/'),
     balance: () => api.get('/admin/sms/balance/'),
     send: (data) => api.post('/admin/sms/send/', data),
+    logs: (params) => api.get('/admin/sms/logs/', { params }),
   },
   smsTemplates: {
     list: () => api.get('/admin/sms-templates/'),
     create: (data) => api.post('/admin/sms-templates/', data),
     update: (id, data) => api.patch(`/admin/sms-templates/${id}/`, data),
     remove: (id) => api.delete(`/admin/sms-templates/${id}/`),
+    preview: (id, data) => api.post(`/admin/sms-templates/${id}/preview/`, data || {}),
     test: (id, data) => api.post(`/admin/sms-templates/${id}/test/`, data),
   },
   personnel: {
@@ -177,8 +181,11 @@ export const authApi = {
     api.post('/auth/token/', { username, password }),
   requestOtp: (phone) => api.post('/auth/otp/request/', { phone }),
   verifyOtp: (phone, code) => api.post('/auth/otp/verify/', { phone, code }),
+  google: (payload) => api.post('/auth/google/', payload),
   register: (payload) => api.post('/auth/registration/', payload),
   me: () => api.get('/auth/user/'),
+  requestPasswordOtp: (phone) => api.post('/auth/password/otp/request/', { phone }),
+  confirmPasswordOtp: (payload) => api.post('/auth/password/otp/confirm/', payload),
   passwordReset: (email) => api.post('/auth/password/reset/', { email }),
   passwordResetConfirm: (payload) =>
     api.post('/auth/password/reset/confirm/', payload),

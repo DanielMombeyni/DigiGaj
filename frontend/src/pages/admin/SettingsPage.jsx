@@ -50,6 +50,10 @@ const empty = () => ({
   company_email: '',
   company_address: '',
   enamad_html: '',
+  google_enabled: false,
+  google_client_id: '',
+  google_client_secret: '',
+  google_phone_required: false,
 })
 
 const emptySmtp = () => ({
@@ -900,6 +904,73 @@ export default function AdminSettingsPage() {
                     </label>
                   )
                 })}
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-mist-200 p-4">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={!!form.google_enabled}
+                    onChange={(e) => setForm({ ...form, google_enabled: e.target.checked })}
+                  />
+                  <span>
+                    <span className="block font-medium text-ink-900">ورود با گوگل</span>
+                    <span className="mt-0.5 block text-xs text-ink-700/45">
+                      دکمه ورود و ثبت‌نام با گوگل در صفحه ورود و ثبت‌نام دیده می‌شود. بعد از ساخت حساب،
+                      نام، نام خانوادگی، نام کاربری و شماره موبایل از کاربر گرفته می‌شود. Client ID و
+                      Secret از همین فرم خوانده می‌شود و اگر خالی باشند از GOOGLE_OAUTH_CLIENT_ID و
+                      GOOGLE_OAUTH_CLIENT_SECRET استفاده می‌شود.
+                    </span>
+                  </span>
+                </label>
+                {form.google_enabled && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block sm:col-span-2">
+                      <span className="label">Client ID</span>
+                      <input
+                        className="input"
+                        dir="ltr"
+                        autoComplete="off"
+                        value={form.google_client_id || ''}
+                        onChange={(e) => setForm({ ...form, google_client_id: e.target.value })}
+                        placeholder={form.google_client_id_from_env ? 'از .env خوانده می‌شود' : ''}
+                      />
+                    </label>
+                    <label className="block sm:col-span-2">
+                      <span className="label">Client Secret</span>
+                      <input
+                        className="input"
+                        type="password"
+                        dir="ltr"
+                        autoComplete="new-password"
+                        value={form.google_client_secret || ''}
+                        onChange={(e) => setForm({ ...form, google_client_secret: e.target.value })}
+                        placeholder={
+                          form.google_secret_from_env
+                            ? 'از .env خوانده می‌شود'
+                            : 'برای تغییر، مقدار جدید وارد کنید'
+                        }
+                      />
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-ink-800 sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={!!form.google_phone_required}
+                        onChange={(e) =>
+                          setForm({ ...form, google_phone_required: e.target.checked })
+                        }
+                      />
+                      شماره موبایل بعد از ورود با گوگل اجباری باشد
+                    </label>
+                    <p className="text-xs text-ink-700/45 sm:col-span-2">
+                      آدرس بازگشت در کنسول گوگل:{' '}
+                      <span className="font-mono" dir="ltr">
+                        /login/google/callback
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
