@@ -69,16 +69,24 @@ def _normalize(raw: dict | None) -> dict:
 
 def sms_available() -> bool:
     """True when an enabled provider is ready, or Signal credentials in .env can send."""
+    from django.core.cache import cache
+
+    cached = cache.get("storefront:sms_available")
+    if cached is not None:
+        return bool(cached)
     try:
         from app.services.sms_service import SmsProviderService
 
         if SmsProviderService.is_available():
-            return True
-        from app.services.sms_templates import signal_ready
+            ok = True
+        else:
+            from app.services.sms_templates import signal_ready
 
-        return signal_ready()
+            ok = signal_ready()
     except Exception:
-        return False
+        ok = False
+    cache.set("storefront:sms_available", ok, 60)
+    return ok
 
 
 def effective_auth_methods(auth: dict | None = None) -> dict:

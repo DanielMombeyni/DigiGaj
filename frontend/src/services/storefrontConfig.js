@@ -1,6 +1,6 @@
 import { shopApi } from '@/services/api'
 
-const TTL_MS = 60_000
+const TTL_MS = 120_000
 
 let cached = null
 let inflight = null

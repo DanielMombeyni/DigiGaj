@@ -2,6 +2,7 @@ import api from './client'
 
 export const shopApi = {
   home: () => api.get('/storefront/home/'),
+  infoPage: (slug) => api.get(`/storefront/info/${slug}/`),
   config: () => api.get('/storefront/config/'),
   products: (params) => api.get('/products/', { params }),
   productPriceStats: (params) => api.get('/products/price-stats/', { params }),

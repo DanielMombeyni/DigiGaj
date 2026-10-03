@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
-import { authApi, shopApi } from '@/services/api'
+import { authApi } from '@/services/api'
+import { getStorefrontConfig } from '@/services/storefrontConfig'
 import { useAuthStore } from '@/store/auth'
 import { brand } from '@/config/brand'
 import Seo from '@/components/common/Seo'
@@ -35,10 +36,9 @@ export default function RegisterPage() {
   const [resendAfter, setResendAfter] = useState(60)
 
   useEffect(() => {
-    shopApi
-      .config()
-      .then((r) => {
-        setGoogleClientId(r.data.google_login?.enabled ? r.data.google_login.client_id || '' : '')
+    getStorefrontConfig()
+      .then((data) => {
+        setGoogleClientId(data.google_login?.enabled ? data.google_login.client_id || '' : '')
       })
       .catch(() => {})
   }, [])

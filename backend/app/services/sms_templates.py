@@ -83,10 +83,19 @@ def get_signal_client() -> SignalSmsService:
 
 
 def signal_ready() -> bool:
+    """Cheap readiness check — avoid building a requests Session on every config hit."""
     try:
-        get_signal_client()
-        return True
-    except SignalSmsConfigError:
+        cfg = (
+            SmsProviderConfig.objects.filter(provider_type="signal")
+            .order_by("-is_enabled", "sort_order", "id")
+            .only("credentials")
+            .first()
+        )
+        creds = (cfg.credentials if cfg else {}) or {}
+        api_key = SignalSmsDriver._resolve_api_key(creds)
+        sender = SignalSmsDriver._resolve_sender(creds)
+        return bool(api_key and sender)
+    except Exception:
         return False
 
 

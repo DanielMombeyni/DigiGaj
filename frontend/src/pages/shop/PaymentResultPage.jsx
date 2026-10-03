@@ -33,7 +33,14 @@ export default function PaymentResultPage() {
           <p className="text-ink-700/60">{extra.instructions}</p>
         </div>
       )}
-      <Link to="/" className="btn-dark mt-8 inline-flex">بازگشت به فروشگاه</Link>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Link to="/account/orders" className="btn-dark inline-flex">
+          سفارش‌های من
+        </Link>
+        <Link to="/" className="btn-ghost inline-flex">
+          بازگشت به فروشگاه
+        </Link>
+      </div>
     </div>
   )
 }

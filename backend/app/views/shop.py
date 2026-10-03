@@ -53,6 +53,12 @@ from app.services.home_content import (
     public_store_settings,
     save_home_hero,
 )
+from app.services.info_pages import (
+    ensure_info_pages_defaults,
+    public_info_page,
+    save_about_content,
+    save_contact_content,
+)
 from app.services.public_pages import (
     ensure_public_pages_defaults,
     get_admin_storefront_pages,
@@ -580,10 +586,23 @@ def product_price_stats(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def storefront_info_page(request, slug):
+    from rest_framework.exceptions import ValidationError
+
+    ensure_info_pages_defaults()
+    try:
+        return Response(public_info_page(slug))
+    except ValidationError as exc:
+        return Response(exc.detail, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def storefront_home(request):
     ensure_storefront_defaults()
     ensure_public_pages_defaults()
     ensure_store_defaults()
+    ensure_info_pages_defaults()
     featured = (
         Product.objects.filter(is_active=True, is_featured=True)
         .select_related("category")
@@ -630,6 +649,7 @@ def admin_storefront_pages(request):
 
     ensure_public_pages_defaults()
     ensure_store_defaults()
+    ensure_info_pages_defaults()
     if request.method == "GET":
         return Response(get_admin_storefront_pages())
     try:
@@ -641,6 +661,31 @@ def admin_storefront_pages(request):
                 clear_icon=str(request.data.get("clear_site_icon", "")).lower()
                 in ("1", "true", "yes"),
             )
+        elif request.data.get("info_page") in ("about", "contact"):
+            import json
+
+            page_key = request.data.get("info_page")
+            raw_content = request.data.get("content")
+            if isinstance(raw_content, str):
+                try:
+                    raw_content = json.loads(raw_content)
+                except json.JSONDecodeError as exc:
+                    raise ValidationError({"content": "فرمت محتوا نامعتبر است."}) from exc
+            if not isinstance(raw_content, dict):
+                raise ValidationError({"content": "محتوای صفحه الزامی است."})
+            if page_key == "about":
+                save_about_content(raw_content)
+            else:
+                save_contact_content(raw_content)
+            enabled_raw = request.data.get("enabled")
+            if enabled_raw is not None and str(enabled_raw) != "":
+                enabled = (
+                    enabled_raw
+                    if isinstance(enabled_raw, bool)
+                    else str(enabled_raw).lower() in ("1", "true", "yes")
+                )
+                save_page_enabled(page_key, enabled)
+            saved = get_admin_storefront_pages()
         elif request.data.get("page_key") is not None and "enabled" in request.data:
             enabled_val = request.data.get("enabled")
             if isinstance(enabled_val, bool):

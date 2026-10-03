@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Sequence
 
 import requests
@@ -25,6 +26,22 @@ from app.sms.signal.exceptions import (
 )
 
 logger = logging.getLogger("app.sms.signal")
+
+# Iranian SMS lines (e.g. 1000) reject free-text unless it ends with this exact phrase.
+SMS_OPT_OUT_SUFFIX = "لغو 11"
+
+
+def ensure_opt_out_suffix(message: str) -> str:
+    """Append provider-required opt-out footer when missing (text SMS only)."""
+    text = (message or "").strip()
+    if not text:
+        return text
+    if re.search(r"لغو[\s\u200c]*11\s*$", text):
+        if text.endswith(SMS_OPT_OUT_SUFFIX):
+            return text
+        text = re.sub(r"[\s\u200c]*لغو[\s\u200c]*11\s*$", "", text).rstrip()
+    return f"{text}\n{SMS_OPT_OUT_SUFFIX}"
+
 
 # Heuristic phrases from Signal / common Iranian SMS gateways (Persian + English).
 _AUTH_HINTS = (
@@ -256,7 +273,7 @@ class SignalSmsService:
         send_at: str | None = None,
     ) -> dict:
         """Send a single SMS. POST /api_v1/sms/send"""
-        text = (message or "").strip()
+        text = ensure_opt_out_suffix(message)
         if not text:
             raise SignalSmsError("متن پیامک نمی‌تواند خالی باشد.")
         payload: dict[str, Any] = {
@@ -286,7 +303,7 @@ class SignalSmsService:
         numbers = self._normalize_numbers(phones)
 
         if isinstance(message, str):
-            text = message.strip()
+            text = ensure_opt_out_suffix(message)
             if not text:
                 raise SignalSmsError("متن پیامک نمی‌تواند خالی باشد.")
             payload: dict[str, Any] = {

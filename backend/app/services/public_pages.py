@@ -166,8 +166,15 @@ def public_pages_payload() -> dict:
 
 
 def get_admin_storefront_pages() -> dict:
+    from app.services.info_pages import (
+        ensure_info_pages_defaults,
+        get_about_content,
+        get_contact_content,
+    )
+
     ensure_store_defaults()
     ensure_public_pages_defaults()
+    ensure_info_pages_defaults()
     settings = get_public_pages_settings()
     hero = get_home_hero()
     pages = []
@@ -182,6 +189,10 @@ def get_admin_storefront_pages() -> dict:
         }
         if key == "home":
             entry["hero"] = hero
+        elif key == "about":
+            entry["content"] = get_about_content()
+        elif key == "contact":
+            entry["content"] = get_contact_content()
         pages.append(entry)
 
     for cms in _cms_pages():

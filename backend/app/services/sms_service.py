@@ -144,9 +144,12 @@ class SmsProviderService:
 
     @staticmethod
     def _sync_phone_otp_auth_method() -> None:
+        from django.core.cache import cache
+
         from app.services.store_config import sync_phone_otp_with_sms
 
         sync_phone_otp_with_sms()
+        cache.delete("storefront:sms_available")
 
     @classmethod
     def get_active(cls) -> SmsProviderConfig | None:

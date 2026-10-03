@@ -140,6 +140,88 @@ function ColorField({ label, value, onChange }) {
   )
 }
 
+function PairListEditor({ title, items, leftKey, rightKey, leftLabel, rightLabel, onChange, max = 8 }) {
+  const rows = Array.isArray(items) && items.length ? items : [{ [leftKey]: '', [rightKey]: '' }]
+  return (
+    <div className="space-y-3 rounded-2xl border border-mist-200 bg-mist-50/40 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-ink-900">{title}</h4>
+        <button
+          type="button"
+          className="cursor-pointer text-xs font-medium text-sea-600 hover:text-copper-600"
+          onClick={() => {
+            if (rows.length >= max) return
+            onChange([...rows, { [leftKey]: '', [rightKey]: '' }])
+          }}
+        >
+          + افزودن
+        </button>
+      </div>
+      <div className="space-y-3">
+        {rows.map((row, index) => (
+          <div key={`${title}-${index}`} className="grid gap-2 rounded-xl border border-mist-200 bg-white p-3 sm:grid-cols-[1fr_1.4fr_auto]">
+            <label className="block">
+              <span className="label">{leftLabel}</span>
+              <input
+                className="input"
+                value={row[leftKey] || ''}
+                onChange={(e) => {
+                  const next = rows.map((item, i) =>
+                    i === index ? { ...item, [leftKey]: e.target.value } : item,
+                  )
+                  onChange(next)
+                }}
+              />
+            </label>
+            <label className="block">
+              <span className="label">{rightLabel}</span>
+              <input
+                className="input"
+                value={row[rightKey] || ''}
+                onChange={(e) => {
+                  const next = rows.map((item, i) =>
+                    i === index ? { ...item, [rightKey]: e.target.value } : item,
+                  )
+                  onChange(next)
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="mt-6 cursor-pointer text-xs text-red-600 hover:underline"
+              onClick={() => onChange(rows.filter((_, i) => i !== index))}
+            >
+              حذف
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LinesEditor({ title, items, onChange, placeholder }) {
+  return (
+    <label className="block">
+      <span className="label">{title}</span>
+      <textarea
+        className="input min-h-[120px]"
+        value={(items || []).join('\n')}
+        onChange={(e) =>
+          onChange(
+            e.target.value
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean),
+          )
+        }
+        placeholder={placeholder}
+      />
+      <span className="mt-1 block text-[11px] text-ink-700/40">هر خط یک مورد</span>
+    </label>
+  )
+}
+
 export default function AdminStorefrontPagesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -160,6 +242,10 @@ export default function AdminStorefrontPagesPage() {
   const [themes, setThemes] = useState([])
   const [colors, setColors] = useState({})
   const [colorFields, setColorFields] = useState([])
+  const [aboutContent, setAboutContent] = useState({})
+  const [aboutEnabled, setAboutEnabled] = useState(true)
+  const [contactContent, setContactContent] = useState({})
+  const [contactEnabled, setContactEnabled] = useState(true)
 
   const cmsPages = useMemo(() => pages.filter((p) => p.kind === 'cms'), [pages])
   const activePage =
@@ -210,6 +296,16 @@ export default function AdminStorefrontPagesPage() {
             image: home.hero?.image || '',
           })
           setHeroImagePreview(home.hero?.image || '')
+        }
+        const about = (data.pages || []).find((p) => p.key === 'about')
+        if (about) {
+          setAboutEnabled(about.enabled !== false)
+          setAboutContent(about.content || {})
+        }
+        const contact = (data.pages || []).find((p) => p.key === 'contact')
+        if (contact) {
+          setContactEnabled(contact.enabled !== false)
+          setContactContent(contact.content || {})
         }
         setIconFile(null)
         setClearIcon(false)
@@ -354,6 +450,34 @@ export default function AdminStorefrontPagesPage() {
     }
   }
 
+  const saveInfoPage = async (pageKey, content, enabled) => {
+    setSaving(true)
+    setError('')
+    setOk('')
+    try {
+      const { data } = await adminApi.storefrontPages.update({
+        info_page: pageKey,
+        content,
+        enabled,
+      })
+      setPages(data.pages || [])
+      const page = (data.pages || []).find((p) => p.key === pageKey)
+      if (pageKey === 'about' && page) {
+        setAboutContent(page.content || {})
+        setAboutEnabled(page.enabled !== false)
+      }
+      if (pageKey === 'contact' && page) {
+        setContactContent(page.content || {})
+        setContactEnabled(page.enabled !== false)
+      }
+      setOk(`صفحه «${page?.label || pageKey}» ذخیره شد.`)
+    } catch (err) {
+      setError(formatError(err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const savePageToggle = async (pageKey, enabled) => {
     setSaving(true)
     setError('')
@@ -476,7 +600,7 @@ export default function AdminStorefrontPagesPage() {
                       <div>
                         <h3 className="font-semibold text-ink-900">آیکون سایت (Favicon)</h3>
                         <p className="mt-1 text-sm leading-7 text-ink-700/55">
-                          در تب مرورگر، بوکمارک و هنگام افزودن به صفحه اصلی موبایل نمایش داده می‌شود.
+                          برای همه صفحات فروشگاه و پنل در تب مرورگر، بوکمارک و «افزودن به صفحه اصلی» موبایل استفاده می‌شود — نه فقط صفحه خانه.
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -748,7 +872,203 @@ export default function AdminStorefrontPagesPage() {
               </form>
             )}
 
-            {activePage && activeTab !== 'home' && (
+            {activeTab === 'about' && (
+              <form
+                className="space-y-5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  saveInfoPage('about', aboutContent, aboutEnabled)
+                }}
+              >
+                <Toggle
+                  label="نمایش صفحه درباره ما"
+                  description="با غیرفعال کردن، لینک منو و مسیر /about مسدود می‌شود."
+                  checked={aboutEnabled}
+                  onChange={setAboutEnabled}
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="label">برچسب بالای عنوان</span>
+                    <input className="input" value={aboutContent.eyebrow || ''} onChange={(e) => setAboutContent({ ...aboutContent, eyebrow: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">عنوان اصلی</span>
+                    <input className="input" value={aboutContent.title || ''} onChange={(e) => setAboutContent({ ...aboutContent, title: e.target.value })} required />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="label">توضیح کوتاه هیرو</span>
+                    <textarea className="input min-h-[80px]" value={aboutContent.subtitle || ''} onChange={(e) => setAboutContent({ ...aboutContent, subtitle: e.target.value })} />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="label">داستان فروشگاه</span>
+                    <textarea className="input min-h-[160px]" value={aboutContent.story || ''} onChange={(e) => setAboutContent({ ...aboutContent, story: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">عنوان ماموریت</span>
+                    <input className="input" value={aboutContent.mission_title || ''} onChange={(e) => setAboutContent({ ...aboutContent, mission_title: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">عنوان چشم‌انداز</span>
+                    <input className="input" value={aboutContent.vision_title || ''} onChange={(e) => setAboutContent({ ...aboutContent, vision_title: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">متن ماموریت</span>
+                    <textarea className="input min-h-[90px]" value={aboutContent.mission || ''} onChange={(e) => setAboutContent({ ...aboutContent, mission: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">متن چشم‌انداز</span>
+                    <textarea className="input min-h-[90px]" value={aboutContent.vision || ''} onChange={(e) => setAboutContent({ ...aboutContent, vision: e.target.value })} />
+                  </label>
+                </div>
+                <PairListEditor
+                  title="آمار و اعداد"
+                  items={aboutContent.stats}
+                  leftKey="value"
+                  rightKey="label"
+                  leftLabel="مقدار"
+                  rightLabel="برچسب"
+                  onChange={(stats) => setAboutContent({ ...aboutContent, stats })}
+                />
+                <PairListEditor
+                  title="ارزش‌ها"
+                  items={aboutContent.values}
+                  leftKey="title"
+                  rightKey="body"
+                  leftLabel="عنوان"
+                  rightLabel="توضیح"
+                  onChange={(values) => setAboutContent({ ...aboutContent, values })}
+                />
+                <LinesEditor
+                  title="نکات برجسته"
+                  items={aboutContent.highlights}
+                  onChange={(highlights) => setAboutContent({ ...aboutContent, highlights })}
+                  placeholder="هر خط یک مزیت"
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block md:col-span-2">
+                    <span className="label">عنوان بخش اعتماد</span>
+                    <input className="input" value={aboutContent.team_title || ''} onChange={(e) => setAboutContent({ ...aboutContent, team_title: e.target.value })} />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="label">متن بخش اعتماد</span>
+                    <textarea className="input min-h-[100px]" value={aboutContent.team_body || ''} onChange={(e) => setAboutContent({ ...aboutContent, team_body: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">متن دکمه اصلی</span>
+                    <input className="input" value={aboutContent.cta_label || ''} onChange={(e) => setAboutContent({ ...aboutContent, cta_label: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">لینک دکمه اصلی</span>
+                    <input className="input" dir="ltr" value={aboutContent.cta_href || ''} onChange={(e) => setAboutContent({ ...aboutContent, cta_href: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">متن دکمه دوم</span>
+                    <input className="input" value={aboutContent.secondary_cta_label || ''} onChange={(e) => setAboutContent({ ...aboutContent, secondary_cta_label: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">لینک دکمه دوم</span>
+                    <input className="input" dir="ltr" value={aboutContent.secondary_cta_href || ''} onChange={(e) => setAboutContent({ ...aboutContent, secondary_cta_href: e.target.value })} />
+                  </label>
+                </div>
+                <button type="submit" className="btn-primary cursor-pointer disabled:opacity-60" disabled={saving}>
+                  {saving ? 'در حال ذخیره...' : 'ذخیره صفحه درباره ما'}
+                </button>
+              </form>
+            )}
+
+            {activeTab === 'contact' && (
+              <form
+                className="space-y-5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  saveInfoPage('contact', contactContent, contactEnabled)
+                }}
+              >
+                <Toggle
+                  label="نمایش صفحه تماس با ما"
+                  description="با غیرفعال کردن، لینک منو و مسیر /contact مسدود می‌شود. تلفن/ایمیل/آدرس از تنظیمات فروشگاه خوانده می‌شود."
+                  checked={contactEnabled}
+                  onChange={setContactEnabled}
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="label">برچسب بالای عنوان</span>
+                    <input className="input" value={contactContent.eyebrow || ''} onChange={(e) => setContactContent({ ...contactContent, eyebrow: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">عنوان اصلی</span>
+                    <input className="input" value={contactContent.title || ''} onChange={(e) => setContactContent({ ...contactContent, title: e.target.value })} required />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="label">توضیح کوتاه</span>
+                    <textarea className="input min-h-[80px]" value={contactContent.subtitle || ''} onChange={(e) => setContactContent({ ...contactContent, subtitle: e.target.value })} />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="label">متن معرفی</span>
+                    <textarea className="input min-h-[120px]" value={contactContent.intro || ''} onChange={(e) => setContactContent({ ...contactContent, intro: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">عنوان فرم</span>
+                    <input className="input" value={contactContent.form_title || ''} onChange={(e) => setContactContent({ ...contactContent, form_title: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">راهنمای فرم</span>
+                    <input className="input" value={contactContent.form_hint || ''} onChange={(e) => setContactContent({ ...contactContent, form_hint: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">عنوان ساعات کاری</span>
+                    <input className="input" value={contactContent.hours_title || ''} onChange={(e) => setContactContent({ ...contactContent, hours_title: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">یادداشت آدرس/نقشه</span>
+                    <input className="input" value={contactContent.map_note || ''} onChange={(e) => setContactContent({ ...contactContent, map_note: e.target.value })} />
+                  </label>
+                </div>
+                <PairListEditor
+                  title="ساعات پاسخ‌گویی"
+                  items={contactContent.hours}
+                  leftKey="days"
+                  rightKey="time"
+                  leftLabel="روزها"
+                  rightLabel="ساعت"
+                  onChange={(hours) => setContactContent({ ...contactContent, hours })}
+                />
+                <PairListEditor
+                  title="کانال‌های پشتیبانی"
+                  items={contactContent.channels}
+                  leftKey="title"
+                  rightKey="body"
+                  leftLabel="عنوان"
+                  rightLabel="توضیح"
+                  onChange={(channels) => setContactContent({ ...contactContent, channels })}
+                />
+                <PairListEditor
+                  title="سوالات پرتکرار"
+                  items={contactContent.faqs}
+                  leftKey="q"
+                  rightKey="a"
+                  leftLabel="سوال"
+                  rightLabel="پاسخ"
+                  onChange={(faqs) => setContactContent({ ...contactContent, faqs })}
+                  max={12}
+                />
+                <div className="grid gap-4">
+                  <label className="block">
+                    <span className="label">عنوان وعده پشتیبانی</span>
+                    <input className="input" value={contactContent.promise_title || ''} onChange={(e) => setContactContent({ ...contactContent, promise_title: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className="label">متن وعده پشتیبانی</span>
+                    <textarea className="input min-h-[90px]" value={contactContent.promise_body || ''} onChange={(e) => setContactContent({ ...contactContent, promise_body: e.target.value })} />
+                  </label>
+                </div>
+                <button type="submit" className="btn-primary cursor-pointer disabled:opacity-60" disabled={saving}>
+                  {saving ? 'در حال ذخیره...' : 'ذخیره صفحه تماس با ما'}
+                </button>
+              </form>
+            )}
+
+            {activePage && activeTab !== 'home' && activeTab !== 'about' && activeTab !== 'contact' && (
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-mist-200 bg-mist-50/50 px-4 py-3">
                   <div>

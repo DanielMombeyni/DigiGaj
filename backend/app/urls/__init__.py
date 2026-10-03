@@ -17,6 +17,7 @@ from app.views.shop import (
     product_price_stats,
     storefront_config,
     storefront_home,
+    storefront_info_page,
 )
 from app.views.auth_otp import (
     confirm_password_otp,
@@ -88,6 +89,7 @@ me_router.register("tickets", CustomerTicketViewSet, basename="me-ticket")
 urlpatterns = [
     path("storefront/home/", storefront_home, name="storefront-home"),
     path("storefront/config/", storefront_config, name="storefront-config"),
+    path("storefront/info/<slug:slug>/", storefront_info_page, name="storefront-info-page"),
     path("products/price-stats/", product_price_stats, name="product-price-stats"),
     path("admin/dashboard/", admin_dashboard, name="admin-dashboard"),
     path("admin/home-hero/", admin_home_hero, name="admin-home-hero"),

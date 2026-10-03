@@ -13,7 +13,7 @@ def seed_signup_otp(apps, schema_editor):
         event="signup_otp",
         target_user="customer",
         mode="text",
-        body_text="کد تأیید ثبت‌نام شما: {code}",
+        body_text="کد تأیید ثبت‌نام شما: {code}\nلغو 11",
         param_keys=[],
         sample_params={},
         is_enabled=True,

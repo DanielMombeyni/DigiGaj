@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/store/auth'
-import { authApi, shopApi } from '@/services/api'
+import { authApi } from '@/services/api'
+import { getStorefrontConfig } from '@/services/storefrontConfig'
 import { brand } from '@/config/brand'
 import Seo from '@/components/common/Seo'
 import AuthShell, { AuthError, formatAuthError } from '@/components/auth/AuthShell'
@@ -95,11 +96,10 @@ export default function LoginPage() {
   )
 
   useEffect(() => {
-    shopApi
-      .config()
-      .then((r) => {
-        const m = normalizeMethods(r.data.auth_methods)
-        const googleId = r.data.google_login?.enabled ? r.data.google_login.client_id || '' : ''
+    getStorefrontConfig()
+      .then((data) => {
+        const m = normalizeMethods(data.auth_methods)
+        const googleId = data.google_login?.enabled ? data.google_login.client_id || '' : ''
         setMethods(m)
         setGoogleClientId(googleId)
         writeCachedAuth(m, googleId)

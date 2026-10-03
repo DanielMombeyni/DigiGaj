@@ -9,12 +9,15 @@ import { persistAppearance, readAppearance } from '@/config/theme'
 
 function upsertLink(rel, href, type) {
   if (!href) return
-  let link = document.head.querySelector(`link[rel="${rel}"]`)
+  const existing = [...document.head.querySelectorAll(`link[rel="${rel}"]`)]
+  let link = existing[0]
   if (!link) {
     link = document.createElement('link')
     link.setAttribute('rel', rel)
     document.head.appendChild(link)
   }
+  // Drop duplicate icon tags so the uploaded site icon wins everywhere.
+  existing.slice(1).forEach((node) => node.remove())
   link.setAttribute('href', href)
   if (type) link.setAttribute('type', type)
   else link.removeAttribute('type')
@@ -23,22 +26,31 @@ function upsertLink(rel, href, type) {
 function applySiteIcon(icon) {
   if (!icon) return
   const href = mediaSrc(icon) || icon
-  const bust = href.includes('?') ? `${href}&v=${Date.now()}` : `${href}?v=${Date.now()}`
+  const absolute = href.startsWith('http') || href.startsWith('data:')
+    ? href
+    : `${window.location.origin}${href.startsWith('/') ? '' : '/'}${href}`
+  const bust = absolute.includes('?') ? `${absolute}&v=${Date.now()}` : `${absolute}?v=${Date.now()}`
   const lower = String(icon).toLowerCase()
   const type = lower.endsWith('.svg')
     ? 'image/svg+xml'
     : lower.endsWith('.ico')
       ? 'image/x-icon'
-      : undefined
+      : lower.endsWith('.png')
+        ? 'image/png'
+        : lower.endsWith('.webp')
+          ? 'image/webp'
+          : lower.endsWith('.jpg') || lower.endsWith('.jpeg')
+            ? 'image/jpeg'
+            : undefined
   upsertLink('icon', bust, type)
   upsertLink('shortcut icon', bust, type)
   upsertLink('apple-touch-icon', bust)
-  persistAppearance({ site_icon: href })
+  persistAppearance({ site_icon: absolute })
 }
 
 /**
- * Applies favicon / apple-touch icons from storefront config app-wide.
- * Re-runs whenever config is invalidated so a new upload replaces the old icon everywhere.
+ * Applies favicon / apple-touch icons from storefront config app-wide
+ * (home, about, contact, login, panel, …).
  */
 export default function SiteBranding() {
   useEffect(() => {

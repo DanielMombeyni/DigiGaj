@@ -49,6 +49,10 @@
       border-radius: 12px; background: #38bdf8; color: #0f172a;
       text-decoration: none; font-weight: 700;
     }
+    a.link {
+      color: #38bdf8;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -67,15 +71,25 @@
       <div class="tracking">{{ tracking }}</div>
     {% endif %}
     <p>
-      <a class="btn" href="{{ shop_orders_url }}">بازگشت به فروشگاه</a>
+      <a class="btn" href="{{ shop_orders_url }}">بازگشت به سایت</a>
     </p>
-    <p style="font-size:.85rem"><a href="{{ deep_link }}" style="color:#38bdf8">بازگشت به اپلیکیشن</a></p>
+    <p style="font-size:.85rem;margin-top:12px">
+      <a class="link" href="{{ account_orders_url }}">مشاهده سفارش‌ها</a>
+      ·
+      <a class="link" href="{{ frontend_url }}/">صفحه اصلی</a>
+    </p>
+    {% if show_app_return and deep_link %}
+      <p style="font-size:.85rem;margin-top:16px">
+        <a class="link" href="{{ deep_link }}">بازگشت به اپلیکیشن</a>
+      </p>
+    {% endif %}
   </div>
+  {% if show_app_return and deep_link %}
   <script>
-    // Attempt deep link for mobile apps
     setTimeout(function () {
       try { window.location.href = "{{ deep_link }}"; } catch (e) {}
     }, 800);
   </script>
+  {% endif %}
 </body>
 </html>

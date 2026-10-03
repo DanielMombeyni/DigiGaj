@@ -85,6 +85,8 @@ export default function App() {
             <Route path="cart" element={guard('cart', <CartPage />)} />
             <Route path="checkout" element={<CheckoutPage />} />
             <Route path="payment/result" element={<PaymentResultPage />} />
+            {/* Legacy/payment return used /orders — keep users out of a blank page */}
+            <Route path="orders" element={<Navigate to="/account/orders" replace />} />
 
             <Route path="account" element={<AccountLayout />}>
               <Route index element={<Navigate to="orders" replace />} />
