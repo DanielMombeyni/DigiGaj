@@ -34,6 +34,7 @@ _TOKEN_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\{([a-zA-Z0-9_]+)\}")
 
 SAMPLE_BY_EVENT = {
     "login_otp": {"code": "123456", "name": "علی رضایی", "phone": "09120000000"},
+    "signup_otp": {"code": "123456", "name": "علی رضایی", "phone": "09120000000"},
     "forgot_password": {
         "name": "علی رضایی",
         "link": "https://example.com/reset-password/sample",
@@ -51,6 +52,7 @@ SAMPLE_BY_EVENT = {
 
 EVENT_TARGETS = {
     "login_otp": ("customer", "all"),
+    "signup_otp": ("customer", "all"),
     "forgot_password": ("customer", "admin", "all"),
     "order_status_changed": ("customer", "admin", "all"),
 }
@@ -395,9 +397,11 @@ def build_pattern_parameters(
     code = str(data.get("code") or "").strip()
     otp_events = {
         SmsTemplate.Event.LOGIN_OTP,
+        SmsTemplate.Event.SIGNUP_OTP,
         SmsTemplate.Event.FORGOT_PASSWORD,
         SmsTemplate.Event.CUSTOM,
         "login_otp",
+        "signup_otp",
         "forgot_password",
         "custom",
     }

@@ -14,6 +14,7 @@ api.interceptors.request.use((req) => {
   const skipBearer =
     (url.includes('/auth/token/') && !url.includes('/auth/token/refresh/')) ||
     url.includes('/auth/registration/') ||
+    url.includes('/auth/register/otp/') ||
     url.includes('/auth/google/') ||
     url.includes('/auth/otp/') ||
     url.includes('/auth/password/reset') ||

@@ -53,6 +53,19 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(BaseRegisterSerializer):
+    email = serializers.EmailField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        raise serializers.ValidationError(
+            "ثبت‌نام فقط با تأیید پیامک انجام می‌شود. ابتدا کد تأیید را دریافت کنید."
+        )
+
     def validate_username(self, username):
         username = re.sub(r"\s+", "", username or "")
         return super().validate_username(username)
+
+    def validate_email(self, email):
+        email = (email or "").strip()
+        if not email:
+            return ""
+        return super().validate_email(email)

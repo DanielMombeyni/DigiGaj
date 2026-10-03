@@ -10,6 +10,7 @@ class SmsTemplate(TimeStampedModel):
 
     class Event(models.TextChoices):
         LOGIN_OTP = "login_otp", "کد ورود"
+        SIGNUP_OTP = "signup_otp", "کد تأیید ثبت‌نام"
         FORGOT_PASSWORD = "forgot_password", "بازیابی رمز"
         ORDER_STATUS_CHANGED = "order_status_changed", "تغییر وضعیت سفارش"
         CUSTOM = "custom", "سفارشی"

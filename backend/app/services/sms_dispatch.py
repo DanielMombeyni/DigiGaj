@@ -67,6 +67,7 @@ def _deliver(phone: str, template: SmsTemplate, context: dict) -> tuple[bool, st
             params = build_pattern_parameters(keys, context, event=template.event)
             if template.event in {
                 SmsTemplate.Event.LOGIN_OTP,
+                SmsTemplate.Event.SIGNUP_OTP,
                 SmsTemplate.Event.FORGOT_PASSWORD,
             } and not any(str(v).strip() for v in params.values()):
                 return False, "مقدار کد برای پارامترهای الگو خالی است."
@@ -77,7 +78,11 @@ def _deliver(phone: str, template: SmsTemplate, context: dict) -> tuple[bool, st
             if (
                 code
                 and template.event
-                in {SmsTemplate.Event.LOGIN_OTP, SmsTemplate.Event.FORGOT_PASSWORD}
+                in {
+                    SmsTemplate.Event.LOGIN_OTP,
+                    SmsTemplate.Event.SIGNUP_OTP,
+                    SmsTemplate.Event.FORGOT_PASSWORD,
+                }
                 and code not in text
             ):
                 text = f"{text}\nکد: {code}".strip() if text else f"کد تأیید: {code}"
@@ -116,24 +121,36 @@ def send_password_reset_otp(phone: str, code: str, name: str = "") -> tuple[bool
     return ok, err
 
 
-def send_login_otp(phone: str, code: str) -> tuple[bool, str | None]:
-    """
-    Prefer the enabled login_otp template (customer, else all).
-    Pattern params use the admin-configured names (e.g. otp) filled from code.
-    """
-    context = {"code": code, "otp": code, "token": code, "name": "", "phone": phone}
-    template = pick_template(SmsTemplate.Event.LOGIN_OTP, SmsTemplate.Target.CUSTOMER)
+def _send_otp_event(event: str, phone: str, code: str, name: str = "") -> tuple[bool, str | None]:
+    context = {
+        "code": code,
+        "otp": code,
+        "token": code,
+        "name": name or "",
+        "phone": phone,
+    }
+    template = pick_template(event, SmsTemplate.Target.CUSTOMER)
     if template and signal_ready():
         ok, err = _deliver(phone, template, context)
-        _log(phone, SmsTemplate.Event.LOGIN_OTP, ok, err, template)
+        _log(phone, event, ok, err, template)
         return ok, err or None
 
     from app.services.sms_service import SmsProviderService
 
     ok, err = SmsProviderService.send_otp(phone, code)
     if not ok:
-        _log(phone, SmsTemplate.Event.LOGIN_OTP, False, err or "", template)
+        _log(phone, event, False, err or "", template)
     return ok, err
+
+
+def send_login_otp(phone: str, code: str, name: str = "") -> tuple[bool, str | None]:
+    """Prefer the enabled login_otp template; fill pattern params from code."""
+    return _send_otp_event(SmsTemplate.Event.LOGIN_OTP, phone, code, name=name)
+
+
+def send_signup_otp(phone: str, code: str, name: str = "") -> tuple[bool, str | None]:
+    """Prefer the enabled signup_otp template for registration verification."""
+    return _send_otp_event(SmsTemplate.Event.SIGNUP_OTP, phone, code, name=name)
 
 
 def _admin_phone() -> str:

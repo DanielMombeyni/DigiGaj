@@ -7,6 +7,7 @@ import { brand } from '@/config/brand'
 import Seo from '@/components/common/Seo'
 import AuthShell, { AuthError, formatAuthError } from '@/components/auth/AuthShell'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import OtpCodeStep from '@/components/auth/OtpCodeStep'
 
 const METHOD_META = {
   username_password: { id: 'username_password', label: 'نام کاربری', field: 'نام کاربری', placeholder: 'مثلاً ali' },
@@ -32,9 +33,9 @@ export default function LoginPage() {
   const [method, setMethod] = useState('username_password')
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
-  const [otpCode, setOtpCode] = useState('')
   const [otpSent, setOtpSent] = useState(false)
   const [debugCode, setDebugCode] = useState('')
+  const [resendAfter, setResendAfter] = useState(60)
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
@@ -63,13 +64,16 @@ export default function LoginPage() {
   useEffect(() => {
     setIdentifier('')
     setPassword('')
-    setOtpCode('')
     setOtpSent(false)
     setDebugCode('')
     setError('')
   }, [method])
 
   const meta = METHOD_META[method] || METHOD_META.username_password
+
+  const goRegister = (phone) => {
+    navigate('/register', { replace: false, state: { phone: phone || '', from: redirectTo } })
+  }
 
   const submitPassword = async (e) => {
     e.preventDefault()
@@ -84,30 +88,71 @@ export default function LoginPage() {
     }
   }
 
-  const sendOtp = async (e) => {
-    e.preventDefault()
+  const sendOtp = async () => {
     setError('')
     setOtpLoading(true)
     try {
       const { data } = await authApi.requestOtp(identifier.trim())
       setOtpSent(true)
       setDebugCode(data.debug_code || '')
+      setResendAfter(data.resend_after || 60)
+      return true
     } catch (err) {
+      if (err?.response?.data?.code === 'not_registered') {
+        goRegister(err.response.data.phone || identifier.trim())
+        return false
+      }
       setError(formatAuthError(err, 'ارسال کد ناموفق بود'))
+      return false
     } finally {
       setOtpLoading(false)
     }
   }
 
-  const submitOtp = async (e) => {
+  const submitOtpRequest = async (e) => {
     e.preventDefault()
+    await sendOtp()
+  }
+
+  const submitOtp = async (code) => {
     setError('')
     try {
-      await loginWithOtp(identifier.trim(), otpCode.trim())
+      await loginWithOtp(identifier.trim(), code)
       navigate(redirectTo, { replace: true })
     } catch (err) {
+      if (err?.response?.data?.code === 'not_registered') {
+        goRegister(err.response.data.phone || identifier.trim())
+        return
+      }
       setError(formatAuthError(err, 'کد تأیید نادرست است'))
     }
+  }
+
+  if (method === 'phone_otp' && otpSent) {
+    return (
+      <>
+        <Seo title="ورود با کد" path="/login" noindex />
+        <OtpCodeStep
+          phone={identifier}
+          title="ورود با کد یک‌بارمصرف"
+          subtitle="کد پیامک‌شده را وارد کنید"
+          successText="کد معمولاً تا ۲ دقیقه معتبر است."
+          submitLabel="تأیید و ورود"
+          submitting={loading}
+          resending={otpLoading}
+          error={error}
+          debugCode={debugCode}
+          resendAfter={resendAfter}
+          onSubmit={submitOtp}
+          onResend={sendOtp}
+          onEditPhone={() => {
+            setOtpSent(false)
+            setDebugCode('')
+            setError('')
+          }}
+        />
+      </>
+    )
   }
 
   return (
@@ -145,7 +190,7 @@ export default function LoginPage() {
         )}
 
         {method === 'phone_otp' ? (
-          <form onSubmit={otpSent ? submitOtp : sendOtp} className="space-y-4">
+          <form onSubmit={submitOtpRequest} className="space-y-4">
             <label className="block">
               <span className="label">{meta.field}</span>
               <input
@@ -156,60 +201,25 @@ export default function LoginPage() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder={meta.placeholder}
                 required
-                disabled={otpSent}
+                dir="ltr"
               />
+              <span className="mt-1.5 block text-xs text-ink-700/45">
+                اگر هنوز ثبت‌نام نکرده‌اید، به صفحه ثبت‌نام منتقل می‌شوید.
+              </span>
             </label>
-            {otpSent && (
-              <label className="block">
-                <span className="label">کد تأیید</span>
-                <input
-                  className="input"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="کد ۶ رقمی"
-                  required
-                />
-                {debugCode && (
-                  <span className="mt-1 block text-[11px] text-amber-700">
-                    کد آزمایشی: {debugCode}
-                  </span>
-                )}
-              </label>
-            )}
             <AuthError message={error} />
             <button
               type="submit"
               className="btn-primary min-h-11 w-full cursor-pointer"
-              disabled={loading || otpLoading}
+              disabled={otpLoading}
             >
-              {otpSent
-                ? loading
-                  ? 'در حال ورود...'
-                  : 'تأیید و ورود'
-                : otpLoading
-                  ? 'در حال ارسال...'
-                  : 'دریافت کد'}
+              {otpLoading ? 'در حال ارسال...' : 'دریافت کد'}
             </button>
             <div className="text-center">
               <Link to="/forgot-password" className="text-xs font-medium text-sea-600 hover:text-copper-600">
                 فراموشی رمز عبور؟
               </Link>
             </div>
-            {otpSent && (
-              <button
-                type="button"
-                className="w-full text-xs text-sea-600 hover:text-copper-600"
-                onClick={() => {
-                  setOtpSent(false)
-                  setOtpCode('')
-                  setDebugCode('')
-                }}
-              >
-                تغییر شماره
-              </button>
-            )}
           </form>
         ) : (
           <form onSubmit={submitPassword} className="space-y-4">

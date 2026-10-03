@@ -19,7 +19,8 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 ACCOUNT_LOGIN_METHODS = {"email", "username"}
-ACCOUNT_SIGNUP_FIELDS = ["email*", "username*", "password1*", "password2*"]
+ACCOUNT_SIGNUP_FIELDS = ["email", "username*", "password1*", "password2*"]
+ACCOUNT_EMAIL_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "optional"
 
 SIMPLE_JWT = {

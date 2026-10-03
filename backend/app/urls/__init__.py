@@ -18,7 +18,14 @@ from app.views.shop import (
     storefront_config,
     storefront_home,
 )
-from app.views.auth_otp import confirm_password_otp, request_otp, request_password_otp, verify_otp
+from app.views.auth_otp import (
+    confirm_password_otp,
+    confirm_signup_otp,
+    request_otp,
+    request_password_otp,
+    request_signup_otp,
+    verify_otp,
+)
 from app.views.google_auth import complete_google_profile, google_login, set_phone
 from app.views.sms_views import (
     AdminSmsCatalogView,
@@ -139,6 +146,8 @@ urlpatterns = [
     ),
     path("auth/otp/request/", request_otp, name="otp-request"),
     path("auth/otp/verify/", verify_otp, name="otp-verify"),
+    path("auth/register/otp/request/", request_signup_otp, name="signup-otp-request"),
+    path("auth/register/otp/confirm/", confirm_signup_otp, name="signup-otp-confirm"),
     path("auth/password/otp/request/", request_password_otp, name="password-otp-request"),
     path("auth/password/otp/confirm/", confirm_password_otp, name="password-otp-confirm"),
     path("auth/google/", google_login, name="google-login"),

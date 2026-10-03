@@ -181,6 +181,8 @@ export const authApi = {
     api.post('/auth/token/', { username, password }),
   requestOtp: (phone) => api.post('/auth/otp/request/', { phone }),
   verifyOtp: (phone, code) => api.post('/auth/otp/verify/', { phone, code }),
+  requestSignupOtp: (payload) => api.post('/auth/register/otp/request/', payload),
+  confirmSignupOtp: (payload) => api.post('/auth/register/otp/confirm/', payload),
   google: (payload) => api.post('/auth/google/', payload),
   register: (payload) => api.post('/auth/registration/', payload),
   me: () => api.get('/auth/user/'),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
 import { authApi, shopApi } from '@/services/api'
 import { useAuthStore } from '@/store/auth'
@@ -7,21 +7,32 @@ import { brand } from '@/config/brand'
 import Seo from '@/components/common/Seo'
 import AuthShell, { AuthError, formatAuthError } from '@/components/auth/AuthShell'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
+import OtpCodeStep from '@/components/auth/OtpCodeStep'
+
+const emptyForm = {
+  username: '',
+  email: '',
+  phone: '',
+  password1: '',
+  password2: '',
+}
 
 export default function RegisterPage() {
   const applySession = useAuthStore((s) => s.applySession)
-  const login = useAuthStore((s) => s.login)
   const navigate = useNavigate()
+  const location = useLocation()
   const [form, setForm] = useState({
-    username: '',
-    email: '',
-    password1: '',
-    password2: '',
+    ...emptyForm,
+    phone: location.state?.phone || '',
   })
+  const [step, setStep] = useState('form')
   const [loading, setLoading] = useState(false)
+  const [otpLoading, setOtpLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [googleClientId, setGoogleClientId] = useState('')
+  const [debugCode, setDebugCode] = useState('')
+  const [resendAfter, setResendAfter] = useState(60)
 
   useEffect(() => {
     shopApi
@@ -38,38 +49,87 @@ export default function RegisterPage() {
     setForm((f) => ({ ...f, [e.target.name]: value }))
   }
 
-  const submit = async (e) => {
-    e.preventDefault()
+  const requestCode = async () => {
     setError('')
     if (form.password1 !== form.password2) {
       setError('تکرار رمز عبور مطابقت ندارد')
-      return
+      return false
     }
     if (form.password1.length < 8) {
       setError('رمز عبور باید حداقل ۸ کاراکتر باشد')
-      return
+      return false
     }
     setLoading(true)
     try {
-      const { data } = await authApi.register({
+      const { data } = await authApi.requestSignupOtp({
         username: form.username.replace(/\s+/g, ''),
         email: form.email.trim(),
+        phone: form.phone.trim(),
         password1: form.password1,
         password2: form.password2,
       })
-      const access = data.access || data.access_token
-      const refresh = data.refresh || data.refresh_token
-      if (access) {
-        await applySession({ access, refresh, user: data.user })
-      } else {
-        await login(form.username.replace(/\s+/g, ''), form.password1)
-      }
-      navigate('/', { replace: true })
+      setDebugCode(data.debug_code || '')
+      setResendAfter(data.resend_after || 60)
+      setStep('otp')
+      return true
     } catch (err) {
-      setError(formatAuthError(err, 'ثبت‌نام ناموفق بود. اطلاعات را بررسی کنید'))
+      setError(formatAuthError(err, 'ارسال کد تأیید ناموفق بود'))
+      return false
     } finally {
       setLoading(false)
     }
+  }
+
+  const submitForm = async (e) => {
+    e.preventDefault()
+    await requestCode()
+  }
+
+  const confirmCode = async (code) => {
+    setError('')
+    setOtpLoading(true)
+    try {
+      const { data } = await authApi.confirmSignupOtp({
+        phone: form.phone.trim(),
+        code,
+      })
+      const access = data.access || data.access_token
+      const refresh = data.refresh || data.refresh_token
+      if (!access) throw new Error('No access token')
+      await applySession({ access, refresh, user: data.user })
+      navigate(location.state?.from || '/', { replace: true })
+    } catch (err) {
+      setError(formatAuthError(err, 'کد تأیید نادرست است'))
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  if (step === 'otp') {
+    return (
+      <>
+        <Seo title="تأیید ثبت‌نام" path="/register" noindex />
+        <OtpCodeStep
+          phone={form.phone}
+          title="تأیید ثبت‌نام"
+          subtitle="بدون وارد کردن کد، حساب ساخته نمی‌شود"
+          successText="اگر کد را وارد نکنید ثبت‌نام کامل نمی‌شود."
+          submitLabel="تأیید و تکمیل ثبت‌نام"
+          submitting={otpLoading}
+          resending={loading}
+          error={error}
+          debugCode={debugCode}
+          resendAfter={resendAfter}
+          onSubmit={confirmCode}
+          onResend={requestCode}
+          onEditPhone={() => {
+            setStep('form')
+            setError('')
+            setDebugCode('')
+          }}
+        />
+      </>
+    )
   }
 
   return (
@@ -77,7 +137,7 @@ export default function RegisterPage() {
       <Seo title="ثبت‌نام" description={`ایجاد حساب مشتری در ${brand.name}`} path="/register" noindex />
       <AuthShell
         title="ایجاد حساب"
-        subtitle={`چند لحظه تا عضویت در ${brand.name}`}
+        subtitle={`شماره موبایل الزامی است؛ ایمیل اختیاری است`}
         footer={
           <>
             قبلاً ثبت‌نام کرده‌اید؟{' '}
@@ -87,9 +147,9 @@ export default function RegisterPage() {
           </>
         }
       >
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submitForm} className="space-y-4">
           <label className="block">
-            <span className="label">نام کاربری</span>
+            <span className="label">نام کاربری *</span>
             <input
               className="input"
               name="username"
@@ -101,7 +161,21 @@ export default function RegisterPage() {
             />
           </label>
           <label className="block">
-            <span className="label">ایمیل</span>
+            <span className="label">شماره موبایل *</span>
+            <input
+              className="input"
+              name="phone"
+              inputMode="tel"
+              autoComplete="tel"
+              value={form.phone}
+              onChange={onChange}
+              placeholder="0912xxxxxxx"
+              required
+              dir="ltr"
+            />
+          </label>
+          <label className="block">
+            <span className="label">ایمیل (اختیاری)</span>
             <input
               className="input text-left"
               type="email"
@@ -109,12 +183,11 @@ export default function RegisterPage() {
               autoComplete="email"
               value={form.email}
               onChange={onChange}
-              required
               dir="ltr"
             />
           </label>
           <label className="block">
-            <span className="label">رمز عبور</span>
+            <span className="label">رمز عبور *</span>
             <div className="relative">
               <input
                 className="input pe-12"
@@ -137,7 +210,7 @@ export default function RegisterPage() {
             </div>
           </label>
           <label className="block">
-            <span className="label">تکرار رمز عبور</span>
+            <span className="label">تکرار رمز عبور *</span>
             <input
               className="input"
               type={showPass ? 'text' : 'password'}
@@ -153,7 +226,7 @@ export default function RegisterPage() {
           <AuthError message={error} />
 
           <button type="submit" className="btn-primary min-h-11 w-full cursor-pointer" disabled={loading}>
-            {loading ? 'در حال ثبت‌نام...' : 'ثبت‌نام و ورود'}
+            {loading ? 'در حال ارسال کد...' : 'دریافت کد تأیید'}
           </button>
         </form>
 
@@ -169,7 +242,7 @@ export default function RegisterPage() {
         )}
 
         <p className="mt-4 text-[11px] leading-5 text-ink-700/40">
-          با ثبت‌نام، شرایط استفاده از فروشگاه را می‌پذیرید.
+          بعد از دریافت کد، فقط با تأیید پیامک حساب ساخته می‌شود.
         </p>
       </AuthShell>
     </>
