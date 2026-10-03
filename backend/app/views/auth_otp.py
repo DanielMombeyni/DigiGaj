@@ -334,8 +334,9 @@ def _validate_signup_payload(data: dict) -> tuple[dict | None, Response | None]:
             _USERNAME_VALIDATOR(username)
         except DjangoValidationError:
             errors["username"] = "نام کاربری فقط می‌تواند حروف، عدد و _ باشد."
-        elif User.objects.filter(username__iexact=username).exists():
-            errors["username"] = "این نام کاربری قبلاً گرفته شده است."
+        else:
+            if User.objects.filter(username__iexact=username).exists():
+                errors["username"] = "این نام کاربری قبلاً گرفته شده است."
 
     if email:
         try:
