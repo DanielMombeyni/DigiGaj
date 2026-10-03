@@ -110,13 +110,13 @@ def _verify_with_tokeninfo(id_token: str, audience: str) -> dict:
             timeout=10,
         )
     except requests.RequestException as exc:
-        raise GoogleAuthError("تأیید هویت گوگل ناموفق بود.", status=502) from exc
+        raise GoogleAuthError("تأیید هویت گوگل ناموفق بود.", status=400) from exc
     if response.status_code != 200:
         raise GoogleAuthError("توکن گوگل نامعتبر است.")
     try:
         data = response.json()
     except ValueError as exc:
-        raise GoogleAuthError("پاسخ گوگل نامعتبر است.", status=502) from exc
+        raise GoogleAuthError("پاسخ گوگل نامعتبر است.", status=400) from exc
     if not isinstance(data, dict) or data.get("error"):
         raise GoogleAuthError("توکن گوگل نامعتبر است.")
     if str(data.get("aud") or "") != audience:
@@ -162,14 +162,14 @@ def exchange_code(*, code: str, code_verifier: str, redirect_uri: str) -> dict:
         )
     except requests.RequestException as exc:
         logger.warning("google token exchange failed: %s", exc.__class__.__name__)
-        raise GoogleAuthError("ارتباط با گوگل برقرار نشد.", status=502) from exc
+        raise GoogleAuthError("ارتباط با گوگل برقرار نشد.", status=400) from exc
     if response.status_code != 200:
         logger.info("google token exchange rejected status=%s", response.status_code)
         raise GoogleAuthError("ورود گوگل تأیید نشد.")
     try:
         payload = response.json()
     except ValueError as exc:
-        raise GoogleAuthError("پاسخ گوگل نامعتبر است.", status=502) from exc
+        raise GoogleAuthError("پاسخ گوگل نامعتبر است.", status=400) from exc
     id_token = str(payload.get("id_token") or "")
     if not id_token:
         raise GoogleAuthError("گوگل شناسه کاربر برنگرداند.")

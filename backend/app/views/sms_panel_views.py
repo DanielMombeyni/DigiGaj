@@ -22,12 +22,15 @@ from app.services.sms_templates import (
 
 def _error(exc):
     if isinstance(exc, SignalSmsError):
+        raw = int(getattr(exc, "http_status", 400) or 400)
+        # Avoid Cloudflare HTML replacement for origin 502/503/504.
+        status_code = 400 if raw >= 500 else raw
         return Response(
             {
                 "detail": str(exc),
                 "code": getattr(exc, "code", "signal_sms_error"),
             },
-            status=getattr(exc, "http_status", 400),
+            status=status_code,
         )
     detail = getattr(exc, "detail", str(exc))
     return Response(detail if isinstance(detail, dict) else {"detail": detail}, status=400)

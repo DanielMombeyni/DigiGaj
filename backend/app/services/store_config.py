@@ -69,13 +69,16 @@ def _normalize(raw: dict | None) -> dict:
 
 def sms_available() -> bool:
     """True when an enabled provider is ready, or Signal credentials in .env can send."""
-    from app.services.sms_service import SmsProviderService
+    try:
+        from app.services.sms_service import SmsProviderService
 
-    if SmsProviderService.is_available():
-        return True
-    from app.services.sms_templates import signal_ready
+        if SmsProviderService.is_available():
+            return True
+        from app.services.sms_templates import signal_ready
 
-    return signal_ready()
+        return signal_ready()
+    except Exception:
+        return False
 
 
 def effective_auth_methods(auth: dict | None = None) -> dict:
@@ -85,7 +88,11 @@ def effective_auth_methods(auth: dict | None = None) -> dict:
         key: bool(base.get(key, DEFAULT_AUTH_METHODS[key]))
         for key in DEFAULT_AUTH_METHODS
     }
-    if out.get("phone_otp") and not sms_available():
+    try:
+        sms_ok = sms_available()
+    except Exception:
+        sms_ok = False
+    if out.get("phone_otp") and not sms_ok:
         out["phone_otp"] = False
     return out
 

@@ -16,21 +16,67 @@ const METHOD_META = {
   phone_otp: { id: 'phone_otp', label: 'تلفن + کد', field: 'شماره موبایل', placeholder: '0912xxxxxxx' },
 }
 
+const METHOD_ORDER = Object.keys(METHOD_META)
+
+// Broader offline fallback so a failed /shop/config does not hide password logins.
 const DEFAULT_METHODS = {
   username_password: true,
-  email_password: false,
-  phone_password: false,
+  email_password: true,
+  phone_password: true,
   phone_otp: false,
 }
 
+const AUTH_CACHE_KEY = 'digigaj_login_auth_cache'
+
+function readCachedAuth() {
+  try {
+    const raw = sessionStorage.getItem(AUTH_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCachedAuth(methods, googleClientId) {
+  try {
+    sessionStorage.setItem(
+      AUTH_CACHE_KEY,
+      JSON.stringify({ methods, googleClientId: googleClientId || '' }),
+    )
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function normalizeMethods(input) {
+  const base = { ...DEFAULT_METHODS }
+  if (!input || typeof input !== 'object') return base
+  for (const key of METHOD_ORDER) {
+    if (key in input) base[key] = Boolean(input[key])
+  }
+  if (!METHOD_ORDER.some((key) => base[key])) {
+    base.username_password = true
+  }
+  return base
+}
+
+function pickDefaultMethod(methods) {
+  if (methods.username_password) return 'username_password'
+  return METHOD_ORDER.find((key) => methods[key]) || 'username_password'
+}
+
 export default function LoginPage() {
+  const cached = readCachedAuth()
   const login = useAuthStore((s) => s.login)
   const loginWithOtp = useAuthStore((s) => s.loginWithOtp)
   const loading = useAuthStore((s) => s.loading)
   const navigate = useNavigate()
   const location = useLocation()
-  const [methods, setMethods] = useState(DEFAULT_METHODS)
-  const [method, setMethod] = useState('username_password')
+  const [methods, setMethods] = useState(() => normalizeMethods(cached?.methods))
+  const [method, setMethod] = useState(() => pickDefaultMethod(normalizeMethods(cached?.methods)))
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [otpSent, setOtpSent] = useState(false)
@@ -39,12 +85,12 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [error, setError] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
-  const [googleClientId, setGoogleClientId] = useState('')
+  const [googleClientId, setGoogleClientId] = useState(() => cached?.googleClientId || '')
 
   const redirectTo = location.state?.from || '/'
 
   const enabled = useMemo(
-    () => Object.entries(methods).filter(([, v]) => v).map(([k]) => k),
+    () => METHOD_ORDER.filter((key) => methods[key]),
     [methods],
   )
 
@@ -52,13 +98,16 @@ export default function LoginPage() {
     shopApi
       .config()
       .then((r) => {
-        const m = { ...DEFAULT_METHODS, ...(r.data.auth_methods || {}) }
+        const m = normalizeMethods(r.data.auth_methods)
+        const googleId = r.data.google_login?.enabled ? r.data.google_login.client_id || '' : ''
         setMethods(m)
-        setGoogleClientId(r.data.google_login?.enabled ? r.data.google_login.client_id || '' : '')
-        const first = Object.keys(METHOD_META).find((k) => m[k]) || 'username_password'
-        setMethod(first)
+        setGoogleClientId(googleId)
+        writeCachedAuth(m, googleId)
+        setMethod((current) => (m[current] ? current : pickDefaultMethod(m)))
       })
-      .catch(() => {})
+      .catch(() => {
+        // Keep cached / fallback methods so username/email/phone password stay available.
+      })
   }, [])
 
   useEffect(() => {
@@ -128,33 +177,6 @@ export default function LoginPage() {
     }
   }
 
-  if (method === 'phone_otp' && otpSent) {
-    return (
-      <>
-        <Seo title="ورود با کد" path="/login" noindex />
-        <OtpCodeStep
-          phone={identifier}
-          title="ورود با کد یک‌بارمصرف"
-          subtitle="کد پیامک‌شده را وارد کنید"
-          successText="کد معمولاً تا ۲ دقیقه معتبر است."
-          submitLabel="تأیید و ورود"
-          submitting={loading}
-          resending={otpLoading}
-          error={error}
-          debugCode={debugCode}
-          resendAfter={resendAfter}
-          onSubmit={submitOtp}
-          onResend={sendOtp}
-          onEditPhone={() => {
-            setOtpSent(false)
-            setDebugCode('')
-            setError('')
-          }}
-        />
-      </>
-    )
-  }
-
   return (
     <>
       <Seo title="ورود مشتریان" description={`ورود به حساب کاربری ${brand.name}`} path="/login" noindex />
@@ -189,7 +211,28 @@ export default function LoginPage() {
           </div>
         )}
 
-        {method === 'phone_otp' ? (
+        {method === 'phone_otp' && otpSent ? (
+          <OtpCodeStep
+            embedded
+            phone={identifier}
+            title="ورود با کد یک‌بارمصرف"
+            subtitle="کد پیامک‌شده را وارد کنید"
+            successText="کد معمولاً تا ۲ دقیقه معتبر است."
+            submitLabel="تأیید و ورود"
+            submitting={loading}
+            resending={otpLoading}
+            error={error}
+            debugCode={debugCode}
+            resendAfter={resendAfter}
+            onSubmit={submitOtp}
+            onResend={sendOtp}
+            onEditPhone={() => {
+              setOtpSent(false)
+              setDebugCode('')
+              setError('')
+            }}
+          />
+        ) : method === 'phone_otp' ? (
           <form onSubmit={submitOtpRequest} className="space-y-4">
             <label className="block">
               <span className="label">{meta.field}</span>

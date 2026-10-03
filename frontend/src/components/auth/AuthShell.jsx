@@ -88,7 +88,18 @@ export function AuthSuccess({ message }) {
 
 export function formatAuthError(err, fallback = 'خطایی رخ داد') {
   if (err?.code === 'ERR_NETWORK') return 'ارتباط با سرور برقرار نشد'
+  const status = err?.response?.status
   const data = err?.response?.data
+  const rawText = typeof data === 'string' ? data : ''
+  // Cloudflare replaces origin 502/5xx bodies with its HTML page.
+  if (
+    status === 502 ||
+    status === 503 ||
+    status === 504 ||
+    /cloudflare|invalid or incomplete response|bad gateway|error code\s*502/i.test(rawText)
+  ) {
+    return 'ارتباط با سرور برقرار نشد. چند لحظه بعد دوباره تلاش کنید.'
+  }
   if (!data || typeof data === 'string') return fallback
   if (typeof data.detail === 'string') return data.detail
   if (data.errors?.detail) {

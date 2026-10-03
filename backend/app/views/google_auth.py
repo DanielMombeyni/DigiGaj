@@ -60,7 +60,11 @@ def google_login(request):
         )
         user, created = link_google_account(claims)
     except GoogleAuthError as exc:
-        return Response({"detail": exc.message}, status=exc.status)
+        # Never return 502/503: Cloudflare replaces those bodies with its HTML error page.
+        code = int(getattr(exc, "status", 400) or 400)
+        if code >= 500:
+            code = status.HTTP_400_BAD_REQUEST
+        return Response({"detail": exc.message}, status=code)
     except Exception as exc:
         detail = getattr(exc, "detail", None)
         if isinstance(detail, dict):

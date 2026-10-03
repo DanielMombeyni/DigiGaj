@@ -10,4 +10,5 @@ SIGNAL_SMS_BASE_URL = env(
     "SIGNAL_SMS_BASE_URL",
     default="https://transmitor.signalads.com",
 ).rstrip("/")
-SIGNAL_SMS_TIMEOUT = env.int("SIGNAL_SMS_TIMEOUT", default=20)
+# Keep short so OTP requests fail closed with JSON 400 instead of hanging the ASGI worker.
+SIGNAL_SMS_TIMEOUT = env.int("SIGNAL_SMS_TIMEOUT", default=12)

@@ -132,7 +132,7 @@ class Command(BaseCommand):
             },
         )
 
-        auth_methods = {
+        default_auth_methods = {
             "username_password": True,
             "email_password": True,
             "phone_password": True,
@@ -141,7 +141,9 @@ class Command(BaseCommand):
         storefront_row = SiteSetting.objects.filter(key="storefront").first()
         if storefront_row and isinstance(storefront_row.value, dict):
             value = dict(storefront_row.value)
-            value["auth_methods"] = auth_methods
+            # Never wipe admin-chosen login methods on bootstrap re-run.
+            existing_auth = value.get("auth_methods") if isinstance(value.get("auth_methods"), dict) else {}
+            value["auth_methods"] = {**default_auth_methods, **existing_auth}
             storefront_row.value = value
             storefront_row.save(update_fields=["value", "updated_at"])
         else:
@@ -149,7 +151,7 @@ class Command(BaseCommand):
                 key="storefront",
                 defaults={
                     "value": {
-                        "auth_methods": auth_methods,
+                        "auth_methods": default_auth_methods,
                         "company_phone": "",
                         "company_email": "",
                         "company_address": "",

@@ -85,7 +85,27 @@ def _bump_counter(key: str, window: int) -> int:
 
 
 def _issue_otp_sms(*, phone: str, ip: str, cache_prefix: str, sender, name: str = ""):
-    """Shared rate-limit + send for login/signup OTP. Returns (Response|None, code|None)."""
+    """Shared rate-limit + send for login/signup OTP. Returns (Response, code|None)."""
+    try:
+        return _issue_otp_sms_inner(
+            phone=phone,
+            ip=ip,
+            cache_prefix=cache_prefix,
+            sender=sender,
+            name=name,
+        )
+    except Exception:
+        logger.exception("%s otp issue crashed phone=%s", cache_prefix, phone[-4:])
+        return (
+            Response(
+                {"detail": "ارسال پیامک ناموفق بود. چند لحظه بعد دوباره تلاش کنید."},
+                status=status.HTTP_400_BAD_REQUEST,
+            ),
+            None,
+        )
+
+
+def _issue_otp_sms_inner(*, phone: str, ip: str, cache_prefix: str, sender, name: str = ""):
     cd_key = f"{cache_prefix}:cd:{phone}"
     otp_key = f"{cache_prefix}:{phone}"
     if cache.get(cd_key):
@@ -362,24 +382,34 @@ def request_signup_otp(request):
 
     phone = payload["phone"]
     pending_key = f"signup:pending:{phone}"
-    cache.set(
-        pending_key,
-        {
-            "username": payload["username"],
-            "email": payload["email"],
-            "phone": phone,
-            "password_hash": make_password(payload["password"]),
-        },
-        SIGNUP_PENDING_TTL,
-    )
-
-    response, _ = _issue_otp_sms(
-        phone=phone,
-        ip=_client_ip(request),
-        cache_prefix="signup-otp",
-        sender=send_signup_otp,
-        name=payload["username"],
-    )
+    try:
+        cache.set(
+            pending_key,
+            {
+                "username": payload["username"],
+                "email": payload["email"],
+                "phone": phone,
+                "password_hash": make_password(payload["password"]),
+            },
+            SIGNUP_PENDING_TTL,
+        )
+        response, _ = _issue_otp_sms(
+            phone=phone,
+            ip=_client_ip(request),
+            cache_prefix="signup-otp",
+            sender=send_signup_otp,
+            name=payload["username"],
+        )
+    except Exception:
+        logger.exception("signup otp request crashed phone=%s", phone[-4:])
+        try:
+            cache.delete(pending_key)
+        except Exception:
+            pass
+        return Response(
+            {"detail": "ارسال کد تأیید ناموفق بود. چند لحظه بعد دوباره تلاش کنید."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     if response.status_code >= 400:
         return response
 
@@ -505,7 +535,15 @@ def request_password_otp(request):
     _bump_counter(f"pwd-otp:rl:ip:{ip}", SEND_WINDOW)
 
     name = (user.get_full_name() or "").strip() or user.get_username()
-    sent, sms_err = send_password_reset_otp(phone, code, name)
+    try:
+        sent, sms_err = send_password_reset_otp(phone, code, name)
+    except Exception:
+        logger.exception("password otp sms crashed phone=%s", phone[-4:])
+        cache.delete(f"pwd-otp:{phone}")
+        return Response(
+            {"detail": "ارسال پیامک ناموفق بود. چند لحظه بعد دوباره تلاش کنید."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     if not sent:
         cache.delete(f"pwd-otp:{phone}")
         if settings.DEBUG and sms_err and "فعالی" in sms_err:

@@ -22,7 +22,8 @@ class SignalSmsError(Exception):
 
 class SignalSmsConfigError(SignalSmsError):
     code = "signal_sms_config"
-    http_status = 503
+    # Keep 4xx: Cloudflare replaces many origin 5xx bodies with its HTML error page.
+    http_status = 400
     default_message = "تنظیمات سرویس پیامک سیگنال ناقص است (کلید API یا خط ارسال)."
 
 
