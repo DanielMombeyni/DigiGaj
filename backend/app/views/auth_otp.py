@@ -30,10 +30,16 @@ MAX_SENDS_PER_IP = 10
 SEND_WINDOW = 600
 
 
+_PERSIAN_DIGITS = str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+
+
 def _normalize_phone(value: str) -> str:
-    digits = "".join(ch for ch in (value or "") if ch.isdigit())
+    text = str(value or "").translate(_PERSIAN_DIGITS)
+    digits = "".join(ch for ch in text if ch.isdigit())
     if digits.startswith("98") and len(digits) >= 12:
         digits = "0" + digits[2:]
+    elif digits.startswith("9") and len(digits) == 10:
+        digits = "0" + digits
     return digits
 
 
@@ -112,7 +118,15 @@ def request_otp(request):
     _bump_counter(f"otp:rl:phone:{phone}", SEND_WINDOW)
     _bump_counter(f"otp:rl:ip:{ip}", SEND_WINDOW)
 
-    sent, sms_err = send_login_otp(phone, code)
+    try:
+        sent, sms_err = send_login_otp(phone, code)
+    except Exception:
+        logger.exception("login otp sms crashed phone=%s", phone[-4:])
+        cache.delete(f"otp:{phone}")
+        return Response(
+            {"detail": "ارسال پیامک ناموفق بود. چند لحظه بعد دوباره تلاش کنید."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     if not sent:
         cache.delete(f"otp:{phone}")
         if settings.DEBUG and sms_err and "فعالی" in sms_err:
@@ -130,9 +144,10 @@ def request_otp(request):
                     "debug_code": code,
                 }
             )
+        # Do not return HTTP 502: Cloudflare replaces origin 502 with its own HTML page.
         return Response(
-            {"detail": sms_err or "ارسال پیامک ناموفق بود."},
-            status=status.HTTP_502_BAD_GATEWAY,
+            {"detail": sms_err or "ارسال پیامک ناموفق بود. تنظیمات سیگنال را در پنل بررسی کنید."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
     cache.set(f"otp:cd:{phone}", 1, RESEND_COOLDOWN)
@@ -292,8 +307,8 @@ def request_password_otp(request):
                 }
             )
         return Response(
-            {"detail": sms_err or "ارسال پیامک ناموفق بود."},
-            status=status.HTTP_502_BAD_GATEWAY,
+            {"detail": sms_err or "ارسال پیامک ناموفق بود. تنظیمات سیگنال را در پنل بررسی کنید."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
     cache.set(f"pwd-otp:cd:{phone}", 1, RESEND_COOLDOWN)

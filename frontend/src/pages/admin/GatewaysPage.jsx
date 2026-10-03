@@ -156,10 +156,19 @@ export default function AdminGatewaysPage() {
     }
     setLoading(true)
     try {
+      const schema = selectedDriver?.credential_schema || editing?.credential_schema || []
+      const secretKeys = new Set(schema.filter((f) => f.secret).map((f) => f.key))
+      const payloadCreds = { ...(creds || {}) }
+      // Empty secret fields mean "keep previous"; do not wipe merchant/token on save.
+      Object.keys(payloadCreds).forEach((key) => {
+        if (secretKeys.has(key) && !String(payloadCreds[key] || '').trim()) {
+          delete payloadCreds[key]
+        }
+      })
       const fd = new FormData()
       fd.append('display_name', displayName)
       fd.append('is_enabled_web', enableWeb ? 'true' : 'false')
-      fd.append('credentials', JSON.stringify(creds || {}))
+      fd.append('credentials', JSON.stringify(payloadCreds))
       if (logoFile) fd.append('logo', logoFile)
 
       if (mode === 'create') {
@@ -241,16 +250,28 @@ export default function AdminGatewaysPage() {
               >
                 {gw.is_ready ? 'آماده' : 'ناقص'}
               </span>
+              {gw.is_enabled_web && !gw.is_ready && (
+                <p className="mt-1 text-[11px] text-amber-700">برای نمایش در فروشگاه، تنظیمات را کامل کنید</p>
+              )}
             </td>
             <td className="px-4 py-3">
               <button
                 type="button"
                 className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs ${
-                  gw.is_enabled_web ? 'bg-emerald-100 text-emerald-700' : 'bg-mist-100 text-ink-700/50'
+                  gw.web_available || (gw.is_enabled_web && gw.is_ready)
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : gw.is_enabled_web
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-mist-100 text-ink-700/50'
                 }`}
                 onClick={() => toggle(gw, 'is_enabled_web')}
+                title={
+                  gw.is_enabled_web && !gw.is_ready
+                    ? 'فعال شده ولی تنظیمات ناقص است؛ در فروشگاه دیده نمی‌شود'
+                    : undefined
+                }
               >
-                {gw.is_enabled_web ? 'فعال' : 'خاموش'}
+                {gw.is_enabled_web ? (gw.is_ready ? 'فعال' : 'فعال (ناقص)') : 'خاموش'}
               </button>
             </td>
             <td className="px-4 py-3">

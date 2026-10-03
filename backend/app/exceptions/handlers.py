@@ -13,7 +13,7 @@ def custom_exception_handler(exc, context):
                 "detail": str(exc),
                 "code": getattr(exc, "code", "signal_sms_error"),
             },
-            status=getattr(exc, "http_status", 502),
+            status=getattr(exc, "http_status", 400),
         )
 
     response = exception_handler(exc, context)

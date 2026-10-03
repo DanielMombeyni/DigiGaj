@@ -9,6 +9,12 @@ from .utils import absolute_media_url, detect_platform
 logger = logging.getLogger("app.payment")
 
 
+def _credentials_dict(raw) -> dict:
+    if isinstance(raw, dict):
+        return raw
+    return {}
+
+
 class PaymentFacade:
     @staticmethod
     def get_config(provider: str, platform: str) -> PaymentGatewayConfig | None:
@@ -28,29 +34,44 @@ class PaymentFacade:
         qs = PaymentGatewayConfig.objects.all().order_by("sort_order", "provider_type")
         results = []
         for cfg in qs:
-            if platform == "app" and not cfg.is_enabled_app:
-                continue
-            if platform == "web" and not cfg.is_enabled_web:
-                continue
-            driver = get_driver(cfg.provider_type)
-            if not driver or not driver.is_ready(cfg.credentials or {}):
-                continue
-            if driver.flow == "native" and platform == "web":
-                continue
-            logo_url = ""
-            if cfg.logo:
-                logo_url = absolute_media_url(cfg.logo.url, request) or ""
-            results.append(
-                {
-                    "provider_type": cfg.provider_type,
-                    "display_name": cfg.display_name,
-                    "flow": driver.flow,
-                    "logo": logo_url,
-                    "logo_url": logo_url,
-                    "currency": "IRR",
-                    "extra": driver.public_extra(cfg.credentials or {}),
-                }
-            )
+            try:
+                if platform == "app" and not cfg.is_enabled_app:
+                    continue
+                if platform == "web" and not cfg.is_enabled_web:
+                    continue
+                driver = get_driver(cfg.provider_type)
+                creds = _credentials_dict(cfg.credentials)
+                if not driver or not driver.is_ready(creds):
+                    logger.info(
+                        "gateway skipped provider=%s platform=%s ready=%s",
+                        cfg.provider_type,
+                        platform,
+                        bool(driver and driver.is_ready(creds)) if driver else False,
+                    )
+                    continue
+                if driver.flow == "native" and platform == "web":
+                    continue
+                logo_url = ""
+                if cfg.logo:
+                    try:
+                        logo_url = absolute_media_url(cfg.logo.url, request) or ""
+                    except Exception:
+                        logo_url = ""
+                results.append(
+                    {
+                        "provider_type": cfg.provider_type,
+                        "display_name": cfg.display_name,
+                        "flow": driver.flow,
+                        "logo": logo_url,
+                        "logo_url": logo_url,
+                        "currency": "IRR",
+                        "extra": driver.public_extra(creds),
+                    }
+                )
+            except Exception:
+                logger.exception(
+                    "gateway list failed provider=%s", getattr(cfg, "provider_type", "?")
+                )
         return results
 
     @classmethod
@@ -74,7 +95,8 @@ class PaymentFacade:
             return None, "درایور درگاه یافت نشد"
         if driver.flow == "native" and platform != "app":
             return None, "این درگاه فقط برای اپلیکیشن است"
-        if not driver.is_ready(cfg.credentials or {}):
+        creds = _credentials_dict(cfg.credentials)
+        if not driver.is_ready(creds):
             return None, "تنظیمات درگاه ناقص است"
         try:
             return driver.start(
@@ -83,7 +105,7 @@ class PaymentFacade:
                 order_id=order_id,
                 description=description,
                 mobile=mobile,
-                creds=cfg.credentials or {},
+                creds=creds,
                 meta=meta,
             )
         except Exception:
@@ -114,7 +136,7 @@ class PaymentFacade:
             return driver.verify(
                 authority=authority,
                 amount_toman=amount_toman,
-                creds=cfg.credentials or {},
+                creds=_credentials_dict(cfg.credentials),
                 callback_data=callback_data,
             )
         except Exception:

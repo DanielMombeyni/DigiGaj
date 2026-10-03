@@ -40,8 +40,16 @@ export default function AccountOrderDetailPage() {
         const arr = Array.isArray(list) ? list : []
         setGateways(arr)
         if (arr[0]?.provider_type) setGateway(arr[0].provider_type)
+        if (!arr.length) {
+          setPayError(
+            'درگاه پرداخت برای وب آماده نیست. در پنل ادمین وضعیت درگاه باید فعال و آماده باشد.',
+          )
+        }
       })
-      .catch(() => setGateways([]))
+      .catch((err) => {
+        setGateways([])
+        setPayError(err?.response?.data?.detail || 'بارگذاری درگاه پرداخت ناموفق بود')
+      })
   }, [order])
 
   const pay = async () => {

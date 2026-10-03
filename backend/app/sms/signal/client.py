@@ -113,7 +113,8 @@ def _raise_for_signal_error(status_code: int, payload: Any) -> None:
 
     if status_code in (401, 403) or any(h in lowered for h in _AUTH_HINTS):
         logger.error("Signal SMS auth failure (%s): %s", status_code, raw[:300])
-        raise SignalSmsAuthError(raw or None, details=payload)
+        # Keep the Persian default; gateway phrases like "Unauthenticated" confuse shoppers.
+        raise SignalSmsAuthError(details=payload)
 
     if status_code == 402 or any(h in lowered for h in _BALANCE_HINTS):
         logger.error("Signal SMS insufficient balance (%s): %s", status_code, raw[:300])

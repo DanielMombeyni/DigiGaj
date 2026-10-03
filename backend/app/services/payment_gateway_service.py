@@ -54,6 +54,8 @@ class PaymentGatewayService:
     def serialize_config(cls, cfg: PaymentGatewayConfig, request=None) -> dict:
         driver = get_driver(cfg.provider_type)
         schema = driver.credential_schema if driver else []
+        creds = cfg.credentials if isinstance(cfg.credentials, dict) else {}
+        ready = bool(driver and driver.is_ready(creds))
         return {
             "id": cfg.id,
             "provider_type": cfg.provider_type,
@@ -63,11 +65,12 @@ class PaymentGatewayService:
             "sort_order": cfg.sort_order,
             "logo": _logo_url(cfg, request),
             "logo_url": _logo_url(cfg, request),
-            "credentials": cls.mask_credentials(cfg.credentials or {}, schema),
+            "credentials": cls.mask_credentials(creds, schema),
             "flow": driver.flow if driver else "",
             "label": driver.label if driver else cfg.display_name,
             "credential_schema": schema,
-            "is_ready": bool(driver and driver.is_ready(cfg.credentials or {})),
+            "is_ready": ready,
+            "web_available": bool(cfg.is_enabled_web and ready),
         }
 
     @classmethod
@@ -122,17 +125,20 @@ class PaymentGatewayService:
             cfg.display_name = data["display_name"]
         if "sort_order" in data and data["sort_order"] is not None:
             cfg.sort_order = int(data["sort_order"])
+        existing_creds = cfg.credentials if isinstance(cfg.credentials, dict) else {}
         if "credentials" in data and data["credentials"] is not None:
+            incoming = data["credentials"] if isinstance(data["credentials"], dict) else {}
             cfg.credentials = cls.merge_credentials(
-                cfg.credentials or {},
-                data["credentials"],
+                existing_creds,
+                incoming,
                 driver.credential_schema,
             )
         enable_app = data.get("is_enabled_app", cfg.is_enabled_app)
         enable_web = data.get("is_enabled_web", cfg.is_enabled_web)
+        creds = cfg.credentials if isinstance(cfg.credentials, dict) else {}
         if enable_app or enable_web:
-            if not driver.is_ready(cfg.credentials or {}):
-                return None, "قبل از فعال‌سازی، credentials باید کامل باشد"
+            if not driver.is_ready(creds):
+                return None, "قبل از فعال‌سازی، تنظیمات درگاه (کلید/مرچنت) باید کامل باشد"
         cfg.is_enabled_app = bool(enable_app)
         cfg.is_enabled_web = bool(enable_web)
         if "logo" in data:

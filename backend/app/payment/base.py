@@ -17,8 +17,13 @@ class BasePaymentDriver(ABC):
 
     @classmethod
     def is_ready(cls, creds: dict) -> bool:
-        ok, _ = cls.validate_credentials(creds or {})
-        return ok
+        if not isinstance(creds, dict):
+            return False
+        try:
+            ok, _ = cls.validate_credentials(creds)
+            return bool(ok)
+        except Exception:
+            return False
 
     @classmethod
     @abstractmethod

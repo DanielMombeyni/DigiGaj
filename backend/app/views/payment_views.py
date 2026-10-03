@@ -62,7 +62,12 @@ class GatewayListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        platform = detect_platform(request)
+        platform = (
+            str(request.query_params.get("platform") or "").lower().strip()
+            or detect_platform(request)
+        )
+        if platform not in ("web", "app"):
+            platform = "web"
         return Response(
             {
                 "platform": platform,

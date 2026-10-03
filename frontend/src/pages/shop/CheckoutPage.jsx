@@ -127,10 +127,11 @@ export default function CheckoutPage() {
       return
     }
     setLoadingData(true)
+    setError('')
     Promise.all([
       accountApi.profile.get(),
       accountApi.addresses.list(),
-      paymentApi.gateways('web').catch(() => ({ data: { gateways: [] } })),
+      paymentApi.gateways('web'),
     ])
       .then(([profileRes, addrRes, gwRes]) => {
         const p = profileRes.data
@@ -146,9 +147,18 @@ export default function CheckoutPage() {
         const active = list.find((a) => a.is_active) || list[0]
         if (active) setSelectedAddressId(active.id)
 
-        const gws = gwRes.data.gateways || []
-        setGateways(gws)
+        const gws = gwRes.data?.gateways || []
+        setGateways(Array.isArray(gws) ? gws : [])
         if (gws[0]) setGateway(gws[0].provider_type)
+      })
+      .catch((err) => {
+        const detail = err?.response?.data?.detail
+        setError(
+          typeof detail === 'string'
+            ? detail
+            : 'بارگذاری اطلاعات تسویه ناموفق بود. دوباره وارد شوید و صفحه را تازه کنید.',
+        )
+        setGateways([])
       })
       .finally(() => setLoadingData(false))
   }, [user])
@@ -286,7 +296,7 @@ export default function CheckoutPage() {
     if (!items.length) return
     const hasPor = items.some((i) => i.price_on_request || Number(i.price_toman) === 0)
     if (!hasPor && !paymentAvailable) {
-      setError('درگاه پرداخت غیرفعال است.')
+      setError('درگاه پرداخت برای وب آماده نیست. تنظیمات درگاه را در پنل ادمین بررسی کنید.')
       return
     }
 
@@ -783,7 +793,8 @@ export default function CheckoutPage() {
             ) : (
               !loadingData && (
                 <p className="mt-5 rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  درگاه پرداخت غیرفعال است. در حال حاضر امکان ثبت و پرداخت سفارش وجود ندارد.
+                  درگاه پرداخت برای وب آماده نیست. در پنل ادمین، درگاه باید «فعال» باشد و وضعیت آن
+                  «آماده» باشد (مرچنت/کلید کامل).
                 </p>
               )
             )}
@@ -796,10 +807,14 @@ export default function CheckoutPage() {
               type="submit"
               className="btn-primary mt-5 w-full cursor-pointer py-3.5 disabled:opacity-50 sm:w-auto sm:min-w-56"
               disabled={loading || !user || loadingData || !canSubmitOrder}
-              title={!canSubmitOrder && !loadingData ? 'درگاه پرداخت غیرفعال است' : undefined}
+              title={
+                !canSubmitOrder && !loadingData
+                  ? 'درگاه پرداخت برای وب آماده نیست'
+                  : undefined
+              }
             >
               {!canSubmitOrder && !loadingData
-                ? 'درگاه پرداخت غیرفعال است'
+                ? 'درگاه آماده نیست'
                 : loading
                   ? 'در حال ثبت...'
                   : hasPor

@@ -43,7 +43,7 @@ class PaypingDriver(BasePaymentDriver):
     def validate_credentials(cls, creds):
         if not (creds or {}).get("api_token"):
             return False, "api_token الزامی است"
-        currency = (creds or {}).get("currency", "T")
+        currency = (creds or {}).get("currency") or "T"
         if currency not in ("T", "R"):
             return False, "currency باید T یا R باشد"
         return True, None

@@ -7,7 +7,8 @@ class SignalSmsError(Exception):
     """Base error for Signal / Transmitor SMS API failures."""
 
     code = "signal_sms_error"
-    http_status = 502
+    # Prefer non-502 statuses: Cloudflare replaces origin 502 bodies with its HTML error page.
+    http_status = 400
     default_message = "خطا در ارتباط با سرویس پیامک سیگنال"
 
     def __init__(self, message: str | None = None, *, details: object | None = None):
