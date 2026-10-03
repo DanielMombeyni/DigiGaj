@@ -192,8 +192,9 @@ def _validate_mode_payload(mode: str, payload: dict) -> tuple[str, int | None, l
     if not pattern_id:
         raise ValidationError({"pattern_id": "شناسه الگوی سیگنال الزامی است."})
     if not param_keys:
-        # allow empty but warn via optional — still OK for patterns with no vars
-        pass
+        raise ValidationError(
+            {"param_keys": "نام پارامترهای الگو را دقیقاً مثل پنل سیگنال، با ویرگول وارد کنید."}
+        )
     return body, pattern_id, param_keys, sample_params
 
 
@@ -294,6 +295,9 @@ def delete_template(row: SmsTemplate) -> None:
 def render_text(template: str, context: dict[str, Any]) -> str:
     def repl(match: re.Match) -> str:
         key = match.group(1) or match.group(2)
+        value = resolve_context_value(key, context)
+        if value != "":
+            return _clean_text(value, limit=300)
         if key in context and context[key] is not None:
             return _clean_text(context[key], limit=300)
         return match.group(0)
@@ -306,6 +310,109 @@ def _clean_text(value: Any, limit: int = 700) -> str:
     return text[:limit]
 
 
+def _norm_key(key: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(key or "").lower())
+
+
+# Signal pattern param names often differ from our context keys (otp vs code).
+_PARAM_ALIASES: dict[str, set[str]] = {
+    "code": {
+        "code",
+        "otp",
+        "token",
+        "pin",
+        "password",
+        "verificationcode",
+        "verifycode",
+        "authcode",
+        "passcode",
+        "smscode",
+    },
+    "name": {
+        "name",
+        "customername",
+        "fullname",
+        "username",
+        "fullname",
+        "fullname",
+    },
+    "phone": {"phone", "mobile", "number", "msisdn", "mobilenumber"},
+    "order_id": {"orderid", "ordernumber", "order", "ordercode"},
+    "status": {"status", "orderstatus", "state"},
+    "link": {"link", "url", "resetlink", "reseturl"},
+    "amount": {"amount", "price", "total", "payable"},
+    "previous_status": {"previousstatus", "oldstatus"},
+    "customer_name": {"customername", "name", "fullname", "fullname"},
+    "order_number": {"ordernumber", "orderid", "order"},
+}
+
+
+def resolve_context_value(param_key: str, context: dict[str, Any] | None) -> str:
+    """Map a template/pattern param name onto the best value from context."""
+    data = context if isinstance(context, dict) else {}
+    key = str(param_key or "").strip()
+    if not key:
+        return ""
+
+    raw = data.get(key)
+    if raw is not None and str(raw).strip() != "":
+        return str(raw)
+
+    lower_map = {str(k).lower(): v for k, v in data.items()}
+    raw = lower_map.get(key.lower())
+    if raw is not None and str(raw).strip() != "":
+        return str(raw)
+
+    wanted = _norm_key(key)
+    for semantic, aliases in _PARAM_ALIASES.items():
+        bucket = {_norm_key(semantic), *aliases}
+        if wanted not in bucket:
+            continue
+        for candidate in (semantic, *sorted(aliases)):
+            for ck, cv in data.items():
+                if _norm_key(ck) == _norm_key(candidate) and str(cv or "").strip():
+                    return str(cv)
+            cv = data.get(semantic)
+            if cv is not None and str(cv).strip():
+                return str(cv)
+    return ""
+
+
+def build_pattern_parameters(
+    param_keys: list[str] | tuple[str, ...] | None,
+    context: dict[str, Any] | None,
+    *,
+    event: str = "",
+) -> dict[str, str]:
+    """
+    Build Signal pattern parameters from the admin-configured key names.
+    Fills values from context using exact keys and common aliases (otp←code).
+    """
+    keys = [str(k).strip() for k in (param_keys or []) if str(k).strip()]
+    data = dict(context or {})
+    params = {key: resolve_context_value(key, data) for key in keys}
+
+    code = str(data.get("code") or "").strip()
+    otp_events = {
+        SmsTemplate.Event.LOGIN_OTP,
+        SmsTemplate.Event.FORGOT_PASSWORD,
+        SmsTemplate.Event.CUSTOM,
+        "login_otp",
+        "forgot_password",
+        "custom",
+    }
+    if code and event in otp_events:
+        empties = [k for k, v in params.items() if not str(v).strip()]
+        code_aliases = _PARAM_ALIASES["code"]
+        for key in empties:
+            if _norm_key(key) in code_aliases or len(keys) == 1:
+                params[key] = code
+        if empties and not any(str(v).strip() for v in params.values()):
+            params[empties[0]] = code
+
+    return params
+
+
 def sample_context(event: str) -> dict[str, str]:
     base = dict(SAMPLE_BY_EVENT.get(event) or SAMPLE_BY_EVENT["custom"])
     return {k: str(v) for k, v in base.items()}
@@ -315,7 +422,8 @@ def preview_template(row: SmsTemplate, params: dict | None = None) -> dict:
     merged = {**sample_context(row.event), **dict(row.sample_params or {}), **(params or {})}
     if row.mode == SmsTemplate.Mode.PATTERN:
         keys = list(row.param_keys or []) or list(merged.keys())
-        rendered = " ".join(f"{key}={merged.get(key, '')}" for key in keys)
+        pattern_params = build_pattern_parameters(keys, merged, event=row.event)
+        rendered = " ".join(f"{key}={pattern_params.get(key, '')}" for key in keys)
     else:
         rendered = render_text(row.body_text, merged)
     return {"text": rendered, "context": {k: str(v) for k, v in merged.items()}}
@@ -416,13 +524,14 @@ def send_template_test(
         if row.mode == SmsTemplate.Mode.PATTERN:
             if not row.pattern_id:
                 raise ValidationError({"pattern_id": "شناسه الگو برای این قالب تنظیم نشده است."})
-            # Ensure declared keys exist (empty string if missing)
-            pattern_params = {}
-            keys = list(row.param_keys or []) or list(merged.keys())
-            for key in keys:
-                pattern_params[key] = str(merged.get(key, ""))
+            keys = [str(k).strip() for k in (row.param_keys or []) if str(k).strip()]
+            if not keys:
+                raise ValidationError(
+                    {"param_keys": "نام پارامترهای الگو را با ویرگول وارد کنید."}
+                )
+            pattern_params = build_pattern_parameters(keys, merged, event=row.event)
             data = client.send_pattern(phone, row.pattern_id, pattern_params)
-            return {"mode": "pattern", "result": data}
+            return {"mode": "pattern", "result": data, "parameters": pattern_params}
 
         text = render_text(row.body_text, merged)
         if not text.strip():

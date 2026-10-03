@@ -7,7 +7,12 @@ import logging
 from django.db import transaction
 
 from app.models import Order, SmsLog, SmsTemplate
-from app.services.sms_templates import get_signal_client, render_text, signal_ready
+from app.services.sms_templates import (
+    build_pattern_parameters,
+    get_signal_client,
+    render_text,
+    signal_ready,
+)
 from app.sms.signal.exceptions import SignalSmsError
 
 logger = logging.getLogger("app.sms")
@@ -54,11 +59,28 @@ def _deliver(phone: str, template: SmsTemplate, context: dict) -> tuple[bool, st
     try:
         client = get_signal_client()
         if template.mode == SmsTemplate.Mode.PATTERN:
-            keys = list(template.param_keys or [])
-            params = {key: str(context.get(key, "")) for key in keys}
+            keys = [str(k).strip() for k in (template.param_keys or []) if str(k).strip()]
+            if not keys:
+                return False, "برای قالب الگو، نام پارامترها را در پنل پیامک وارد کنید."
+            if not template.pattern_id:
+                return False, "شناسه الگوی سیگنال تنظیم نشده است."
+            params = build_pattern_parameters(keys, context, event=template.event)
+            if template.event in {
+                SmsTemplate.Event.LOGIN_OTP,
+                SmsTemplate.Event.FORGOT_PASSWORD,
+            } and not any(str(v).strip() for v in params.values()):
+                return False, "مقدار کد برای پارامترهای الگو خالی است."
             client.send_pattern(phone, template.pattern_id, params)
         else:
             text = render_text(template.body_text, context).strip()
+            code = str((context or {}).get("code") or "").strip()
+            if (
+                code
+                and template.event
+                in {SmsTemplate.Event.LOGIN_OTP, SmsTemplate.Event.FORGOT_PASSWORD}
+                and code not in text
+            ):
+                text = f"{text}\nکد: {code}".strip() if text else f"کد تأیید: {code}"
             if not text:
                 return False, "متن قالب خالی است."
             client.send_sms(phone, text)
@@ -74,27 +96,13 @@ def send_password_reset_otp(phone: str, code: str, name: str = "") -> tuple[bool
     """Send the forgot-password template. The numeric code is always in the text."""
     context = {
         "code": code,
+        "otp": code,
+        "token": code,
         "name": name or "کاربر",
         "phone": phone,
         "link": "",
     }
     template = pick_template(SmsTemplate.Event.FORGOT_PASSWORD, SmsTemplate.Target.CUSTOMER)
-    if template and signal_ready() and template.mode == SmsTemplate.Mode.TEXT:
-        rendered = render_text(template.body_text, context).strip()
-        if code not in rendered:
-            rendered = f"{rendered}\nکد بازیابی: {code}".strip() if rendered else f"کد بازیابی رمز: {code}"
-        try:
-            get_signal_client().send_sms(phone, rendered)
-            _log(phone, SmsTemplate.Event.FORGOT_PASSWORD, True, "", template)
-            return True, None
-        except SignalSmsError as exc:
-            _log(phone, SmsTemplate.Event.FORGOT_PASSWORD, False, str(exc), template)
-            return False, str(exc)
-        except Exception:
-            logger.exception("password reset sms failed")
-            _log(phone, SmsTemplate.Event.FORGOT_PASSWORD, False, "ارسال پیامک ناموفق بود.", template)
-            return False, "ارسال پیامک ناموفق بود."
-
     if template and signal_ready():
         ok, err = _deliver(phone, template, context)
         _log(phone, SmsTemplate.Event.FORGOT_PASSWORD, ok, err, template)
@@ -111,9 +119,9 @@ def send_password_reset_otp(phone: str, code: str, name: str = "") -> tuple[bool
 def send_login_otp(phone: str, code: str) -> tuple[bool, str | None]:
     """
     Prefer the enabled login_otp template (customer, else all).
-    If Signal is not ready, keep the existing provider OTP path.
+    Pattern params use the admin-configured names (e.g. otp) filled from code.
     """
-    context = {"code": code, "name": "", "phone": phone}
+    context = {"code": code, "otp": code, "token": code, "name": "", "phone": phone}
     template = pick_template(SmsTemplate.Event.LOGIN_OTP, SmsTemplate.Target.CUSTOMER)
     if template and signal_ready():
         ok, err = _deliver(phone, template, context)
@@ -215,13 +223,19 @@ def queue_forgot_password_sms(user) -> None:
 
 def queue_order_status_sms(order: Order, previous_status: str = "") -> None:
     name = order.full_name or ""
+    order_no = order.order_number or ""
+    status = order.get_status_display()
     context = {
-        "order_id": order.order_number,
-        "status": order.get_status_display(),
+        "order_id": order_no,
+        "order_number": order_no,
+        "orderId": order_no,
+        "status": status,
+        "order_status": status,
         "name": name,
-        "order_number": order.order_number,
         "customer_name": name,
+        "fullname": name,
         "phone": order.phone or "",
+        "mobile": order.phone or "",
         "previous_status": previous_status or "",
     }
     queue_sms_event(SmsTemplate.Event.ORDER_STATUS_CHANGED, context, order.phone or "")

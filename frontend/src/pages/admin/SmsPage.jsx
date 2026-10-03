@@ -967,7 +967,7 @@ export default function AdminSmsPage() {
                 />
               </label>
               <label className="block">
-                <span className="label">نام پارامترها (با ویرگول)</span>
+                <span className="label">نام پارامترها (با ویرگول) — دقیقاً مثل پنل سیگنال</span>
                 <input
                   className="input"
                   value={form.param_keys}
@@ -975,6 +975,9 @@ export default function AdminSmsPage() {
                   placeholder="otp, name"
                   dir="ltr"
                 />
+                <span className="mt-1 block text-xs text-ink-700/45">
+                  مقدار کد ورود/بازیابی روی همین نام‌ها پر می‌شود (مثلاً otp یا code).
+                </span>
               </label>
               {formParamKeys.length > 0 && (
                 <div>
