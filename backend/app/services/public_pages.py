@@ -134,11 +134,19 @@ def get_public_pages_settings() -> dict:
     return _normalize(row.value if row else None)
 
 
+# Built-in storefront routes — never list these as generic CMS pages in admin.
+_RESERVED_CMS_SLUGS = frozenset(
+    {"about", "contact", "home", "products", "categories", "cart", "login", "register"}
+)
+
+
 def _cms_pages() -> list[dict]:
     rows = SitePage.objects.order_by("slug").values("slug", "title", "is_published")
     out = []
     for row in rows:
         slug = row["slug"]
+        if slug in _RESERVED_CMS_SLUGS:
+            continue
         out.append(
             {
                 "key": f"cms:{slug}",
@@ -167,6 +175,8 @@ def public_pages_payload() -> dict:
 
 def get_admin_storefront_pages() -> dict:
     from app.services.info_pages import (
+        DEFAULT_ABOUT,
+        DEFAULT_CONTACT,
         ensure_info_pages_defaults,
         get_about_content,
         get_contact_content,
@@ -190,9 +200,15 @@ def get_admin_storefront_pages() -> dict:
         if key == "home":
             entry["hero"] = hero
         elif key == "about":
-            entry["content"] = get_about_content()
+            try:
+                entry["content"] = get_about_content()
+            except Exception:
+                entry["content"] = deepcopy(DEFAULT_ABOUT)
         elif key == "contact":
-            entry["content"] = get_contact_content()
+            try:
+                entry["content"] = get_contact_content()
+            except Exception:
+                entry["content"] = deepcopy(DEFAULT_CONTACT)
         pages.append(entry)
 
     for cms in _cms_pages():

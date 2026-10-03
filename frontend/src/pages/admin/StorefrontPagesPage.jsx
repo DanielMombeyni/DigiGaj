@@ -52,6 +52,17 @@ const NAV_STATIC = {
   [TAB_COLORS]: { key: TAB_COLORS, label: 'استایل و رنگ‌ها', kind: 'colors' },
 }
 
+const ROUTE_FALLBACKS = {
+  about: { key: 'about', label: 'درباره ما', path: '/about', kind: 'route', enabled: true },
+  contact: { key: 'contact', label: 'تماس با ما', path: '/contact', kind: 'route', enabled: true },
+  home: { key: 'home', label: 'خانه', path: '/', kind: 'route', enabled: true },
+  products: { key: 'products', label: 'محصولات', path: '/products', kind: 'route', enabled: true },
+  categories: { key: 'categories', label: 'دسته‌بندی‌ها', path: '/categories', kind: 'route', enabled: true },
+  cart: { key: 'cart', label: 'سبد خرید', path: '/cart', kind: 'route', enabled: true },
+  login: { key: 'login', label: 'ورود', path: '/login', kind: 'route', enabled: true },
+  register: { key: 'register', label: 'ثبت‌نام', path: '/register', kind: 'route', enabled: true },
+}
+
 function formatError(err) {
   const detail = err.response?.data
   if (!detail) return err.message || 'خطا در ذخیره'
@@ -84,7 +95,7 @@ function StatusBadge({ enabled }) {
 function Toggle({ checked, onChange, label, description }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-2xl border border-mist-200 bg-mist-50/40 p-4">
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink-900">{label}</p>
         {description && <p className="mt-1 text-xs leading-6 text-ink-700/50">{description}</p>}
       </div>
@@ -92,11 +103,16 @@ function Toggle({ checked, onChange, label, description }) {
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange(!checked)}
-        className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition ${checked ? 'bg-emerald-500' : 'bg-mist-300'}`}
+        className={`relative mt-0.5 h-7 w-12 shrink-0 overflow-visible rounded-full transition ${
+          checked ? 'bg-emerald-500' : 'bg-mist-300'
+        }`}
       >
         <span
-          className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${checked ? 'right-0.5' : 'right-[calc(100%-1.625rem)]'}`}
+          className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-[inset-inline-start] ${
+            checked ? 'start-[1.375rem]' : 'start-0.5'
+          }`}
         />
       </button>
     </div>
@@ -251,7 +267,7 @@ export default function AdminStorefrontPagesPage() {
   const activePage =
     activeTab === TAB_GENERAL || activeTab === TAB_COLORS
       ? null
-      : pages.find((p) => p.key === activeTab)
+      : pages.find((p) => p.key === activeTab) || ROUTE_FALLBACKS[activeTab] || null
 
   const stats = useMemo(() => {
     const enabled = pages.filter((p) => p.enabled !== false).length
@@ -298,15 +314,11 @@ export default function AdminStorefrontPagesPage() {
           setHeroImagePreview(home.hero?.image || '')
         }
         const about = (data.pages || []).find((p) => p.key === 'about')
-        if (about) {
-          setAboutEnabled(about.enabled !== false)
-          setAboutContent(about.content || {})
-        }
+        setAboutEnabled(about ? about.enabled !== false : true)
+        if (about?.content) setAboutContent(about.content)
         const contact = (data.pages || []).find((p) => p.key === 'contact')
-        if (contact) {
-          setContactEnabled(contact.enabled !== false)
-          setContactContent(contact.content || {})
-        }
+        setContactEnabled(contact ? contact.enabled !== false : true)
+        if (contact?.content) setContactContent(contact.content)
         setIconFile(null)
         setClearIcon(false)
         setHeroImageFile(null)
@@ -470,6 +482,7 @@ export default function AdminStorefrontPagesPage() {
         setContactContent(page.content || {})
         setContactEnabled(page.enabled !== false)
       }
+      invalidateStorefrontConfig()
       setOk(`صفحه «${page?.label || pageKey}» ذخیره شد.`)
     } catch (err) {
       setError(formatError(err))
@@ -485,8 +498,15 @@ export default function AdminStorefrontPagesPage() {
     try {
       const { data } = await adminApi.storefrontPages.update({ page_key: pageKey, enabled })
       setPages(data.pages || [])
+      if (pageKey === 'about') setAboutEnabled(enabled)
+      if (pageKey === 'contact') setContactEnabled(enabled)
+      if (pageKey === 'home') setHomeEnabled(enabled)
+      invalidateStorefrontConfig()
       setOk(enabled ? 'صفحه فعال شد.' : 'صفحه غیرفعال شد.')
     } catch (err) {
+      if (pageKey === 'about') setAboutEnabled(!enabled)
+      if (pageKey === 'contact') setContactEnabled(!enabled)
+      if (pageKey === 'home') setHomeEnabled(!enabled)
       setError(formatError(err))
     } finally {
       setSaving(false)
@@ -498,7 +518,7 @@ export default function AdminStorefrontPagesPage() {
       ? 'تنظیمات عمومی'
       : activeTab === TAB_COLORS
         ? 'استایل و رنگ‌بندی'
-        : activePage?.label || 'صفحه'
+        : activePage?.label || ROUTE_FALLBACKS[activeTab]?.label || 'صفحه'
 
   const previewPath = activePage?.path || '/'
   const themeLabel =
@@ -553,8 +573,17 @@ export default function AdminStorefrontPagesPage() {
               <AdminCard key={group.id} title={group.label} className="!p-3">
                 <ul className="space-y-1">
                   {group.keys.map((key) => {
-                    const page = NAV_STATIC[key] || pages.find((p) => p.key === key)
+                    const page =
+                      NAV_STATIC[key] || pages.find((p) => p.key === key) || ROUTE_FALLBACKS[key]
                     if (!page) return null
+                    const enabled =
+                      key === 'about'
+                        ? aboutEnabled
+                        : key === 'contact'
+                          ? contactEnabled
+                          : key === 'home'
+                            ? homeEnabled
+                            : page.enabled !== false
                     const active = activeTab === key
                     return (
                       <li key={key}>
@@ -571,7 +600,7 @@ export default function AdminStorefrontPagesPage() {
                           <span className="min-w-0 flex-1 truncate font-medium">{page.label}</span>
                           {key !== TAB_GENERAL && key !== TAB_COLORS && (
                             <span
-                              className={`h-2 w-2 shrink-0 rounded-full ${page.enabled !== false ? 'bg-emerald-400' : 'bg-mist-300'}`}
+                              className={`h-2 w-2 shrink-0 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-mist-300'}`}
                               aria-hidden
                             />
                           )}
@@ -881,10 +910,13 @@ export default function AdminStorefrontPagesPage() {
                 }}
               >
                 <Toggle
-                  label="نمایش صفحه درباره ما"
-                  description="با غیرفعال کردن، لینک منو و مسیر /about مسدود می‌شود."
+                  label={aboutEnabled ? 'صفحه درباره ما فعال است' : 'صفحه درباره ما غیرفعال است'}
+                  description="با غیرفعال کردن، لینک منو و مسیر /about مسدود می‌شود. تغییر بلافاصله ذخیره می‌شود."
                   checked={aboutEnabled}
-                  onChange={setAboutEnabled}
+                  onChange={(enabled) => {
+                    setAboutEnabled(enabled)
+                    savePageToggle('about', enabled)
+                  }}
                 />
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">
@@ -985,10 +1017,13 @@ export default function AdminStorefrontPagesPage() {
                 }}
               >
                 <Toggle
-                  label="نمایش صفحه تماس با ما"
-                  description="با غیرفعال کردن، لینک منو و مسیر /contact مسدود می‌شود. تلفن/ایمیل/آدرس از تنظیمات فروشگاه خوانده می‌شود."
+                  label={contactEnabled ? 'صفحه تماس با ما فعال است' : 'صفحه تماس با ما غیرفعال است'}
+                  description="با غیرفعال کردن، لینک منو و مسیر /contact مسدود می‌شود. تغییر بلافاصله ذخیره می‌شود."
                   checked={contactEnabled}
-                  onChange={setContactEnabled}
+                  onChange={(enabled) => {
+                    setContactEnabled(enabled)
+                    savePageToggle('contact', enabled)
+                  }}
                 />
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block">

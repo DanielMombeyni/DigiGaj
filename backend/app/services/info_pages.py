@@ -11,6 +11,7 @@ from app.models import SitePage, SiteSetting
 
 ABOUT_KEY = "storefront_about"
 CONTACT_KEY = "storefront_contact"
+INFO_PAGES_ENABLE_REPAIR_KEY = "storefront_info_pages_enable_repair_v1"
 
 DEFAULT_ABOUT = {
     "eyebrow": "درباره فروشگاه",
@@ -308,9 +309,23 @@ def save_contact_content(payload: dict) -> dict:
 
 
 def ensure_info_pages_defaults() -> None:
+    from app.services.public_pages import PUBLIC_PAGES_KEY, get_public_pages_settings
+
     if not SiteSetting.objects.filter(key=ABOUT_KEY).exists():
         SiteSetting.objects.create(key=ABOUT_KEY, value=deepcopy(DEFAULT_ABOUT))
         _sync_site_page("about", DEFAULT_ABOUT["title"], DEFAULT_ABOUT["story"])
     if not SiteSetting.objects.filter(key=CONTACT_KEY).exists():
         SiteSetting.objects.create(key=CONTACT_KEY, value=deepcopy(DEFAULT_CONTACT))
         _sync_site_page("contact", DEFAULT_CONTACT["title"], DEFAULT_CONTACT["intro"])
+
+    # One-time repair: older installs hid /about|/contact via public_pages.enabled
+    # (or omitted the keys) while the admin UI showed a CMS duplicate without a clear
+    # enable control. Re-enable once; admins can disable again afterward.
+    if not SiteSetting.objects.filter(key=INFO_PAGES_ENABLE_REPAIR_KEY).exists():
+        settings = get_public_pages_settings()
+        enabled = dict(settings.get("enabled") or {})
+        enabled["about"] = True
+        enabled["contact"] = True
+        settings["enabled"] = enabled
+        SiteSetting.objects.update_or_create(key=PUBLIC_PAGES_KEY, defaults={"value": settings})
+        SiteSetting.objects.create(key=INFO_PAGES_ENABLE_REPAIR_KEY, value={"done": True})

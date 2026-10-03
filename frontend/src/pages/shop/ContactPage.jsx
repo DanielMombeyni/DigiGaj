@@ -174,7 +174,7 @@ export default function ContactPage() {
                   <Reveal key={item.title} className="rounded-3xl border border-mist-200 bg-white p-5 shadow-soft">
                     <div className="flex items-start gap-3">
                       <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-copper-500/10 text-copper-600">
-                        <Icon className="h-4.5 w-4" strokeWidth={1.8} />
+                        <Icon className="h-4 w-4" strokeWidth={1.8} />
                       </span>
                       <div>
                         <h3 className="font-semibold text-ink-950">{item.title}</h3>
