@@ -4,7 +4,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from app.filters.product import ProductFilter, ProductOrderingFilter
-from app.models import Product, ProductColor, ProductVariant
+from app.models import Category, Product, ProductColor, ProductVariant
 from app.services.product_display_price import annotate_display_price
 from app.serializers import ProductListSerializer
 
@@ -155,3 +155,49 @@ def test_products_list_api_price_filter(api):
     assert "api-plain" not in slugs
     hit = next(row for row in results if row["slug"] == "api-v")
     assert hit["min_price"] == 1_200_000
+
+
+@pytest.mark.django_db
+def test_price_stats_includes_category_descendants_and_excludes_on_request(api):
+    root = Category.objects.create(name="Root", slug="root-ps", sort_order=1)
+    child = Category.objects.create(name="Child", slug="child-ps", parent=root, sort_order=1)
+    other = Category.objects.create(name="Other", slug="other-ps", sort_order=2)
+
+    in_child = _product(price_toman=2_000_000, slug="ps-child", sku="SKU-PS-C", category=child)
+    in_root = _product(price_toman=8_000_000, slug="ps-root", sku="SKU-PS-R", category=root)
+    elsewhere = _product(price_toman=500_000, slug="ps-other", sku="SKU-PS-O", category=other)
+    on_req = _product(
+        price_toman=100_000,
+        price_on_request=True,
+        slug="ps-or",
+        sku="SKU-PS-OR",
+        category=child,
+    )
+    _variant(in_child, price=1_500_000)
+
+    all_res = api.get("/api/v1/products/price-stats/")
+    assert all_res.status_code == 200
+    assert all_res.data["has_priced_products"] is True
+    assert all_res.data["min_price"] == 500_000
+    assert all_res.data["max_price"] == 8_000_000
+
+    root_res = api.get("/api/v1/products/price-stats/", {"category": root.id})
+    assert root_res.status_code == 200
+    assert root_res.data["has_priced_products"] is True
+    # Child variant display (1.5M) + root base (8M); excludes on-request and other category
+    assert root_res.data["min_price"] == 1_500_000
+    assert root_res.data["max_price"] == 8_000_000
+
+    child_res = api.get("/api/v1/products/price-stats/", {"category": child.id})
+    assert child_res.status_code == 200
+    assert child_res.data["min_price"] == 1_500_000
+    assert child_res.data["max_price"] == 1_500_000
+
+    empty = Category.objects.create(name="Empty", slug="empty-ps", sort_order=9)
+    empty_res = api.get("/api/v1/products/price-stats/", {"category": empty.id})
+    assert empty_res.status_code == 200
+    assert empty_res.data["has_priced_products"] is False
+    assert empty_res.data["min_price"] is None
+    assert empty_res.data["max_price"] is None
+
+    assert elsewhere.id and on_req.id and in_root.id

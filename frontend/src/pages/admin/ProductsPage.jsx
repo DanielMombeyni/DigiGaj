@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Package,
   Layers,
   Search,
@@ -47,6 +48,48 @@ const emptyForm = () => ({
   is_featured: false,
   display_priority: 0,
 })
+
+const CARD_SPEC_SLOTS = 4
+
+function emptyCardSpecs() {
+  return Array.from({ length: CARD_SPEC_SLOTS }, () => ({ title: '', value: '' }))
+}
+
+function normalizeCardSpecsFromApi(list) {
+  const base = emptyCardSpecs()
+  const rows = Array.isArray(list) ? list : []
+  for (let i = 0; i < CARD_SPEC_SLOTS; i += 1) {
+    const row = rows[i]
+    if (!row) continue
+    base[i] = {
+      title: String(row.title || row.name || ''),
+      value: String(row.value || ''),
+    }
+  }
+  return base
+}
+
+/** @returns {string|null} Persian validation message or null */
+function validateCardSpecs(slots) {
+  for (let i = 0; i < slots.length; i += 1) {
+    const title = String(slots[i]?.title || '').trim()
+    const value = String(slots[i]?.value || '').trim()
+    if ((title && !value) || (!title && value)) {
+      return `ردیف ${faDigits(i + 1)} مشخصات نمایشی کارت: هم «عنوان» و هم «مقدار» را پر کنید یا هر دو را خالی بگذارید.`
+    }
+  }
+  return null
+}
+
+function cardSpecsPayload(slots) {
+  return slots
+    .map((s) => ({
+      title: String(s.title || '').trim(),
+      value: String(s.value || '').trim(),
+    }))
+    .filter((s) => s.title && s.value)
+    .slice(0, CARD_SPEC_SLOTS)
+}
 
 const DISPLAY_PRIORITY_MAX = 9999
 
@@ -344,6 +387,7 @@ export default function AdminProductsPage() {
   const [sizes, setSizes] = useState([])
   const [variants, setVariants] = useState([])
   const [attributes, setAttributes] = useState([])
+  const [cardSpecs, setCardSpecs] = useState(() => emptyCardSpecs())
   const [existingImages, setExistingImages] = useState([])
   const [newFiles, setNewFiles] = useState([])
   const [editing, setEditing] = useState(null)
@@ -526,6 +570,7 @@ export default function AdminProductsPage() {
     setSizes([])
     setVariants([])
     setAttributes([])
+    setCardSpecs(emptyCardSpecs())
     setExistingImages([])
     setNewFiles([])
   }
@@ -611,6 +656,7 @@ export default function AdminProductsPage() {
           value: a.value,
         })),
       )
+      setCardSpecs(normalizeCardSpecsFromApi(data.card_specs))
       setExistingImages(data.images || [])
       setNewFiles([])
       setOpen(true)
@@ -676,6 +722,12 @@ export default function AdminProductsPage() {
       setLoading(false)
       return
     }
+    const cardSpecsError = validateCardSpecs(cardSpecs)
+    if (cardSpecsError) {
+      setError(cardSpecsError)
+      setLoading(false)
+      return
+    }
     const payload = {
       ...formFields,
       category: form.category ? Number(form.category) : null,
@@ -717,6 +769,7 @@ export default function AdminProductsPage() {
       attributes: attributes
         .filter((a) => a.name.trim() && a.value.trim())
         .map((a, i) => ({ name: a.name.trim(), value: a.value.trim(), sort_order: i })),
+      card_specs: cardSpecsPayload(cardSpecs),
     }
     // Ensure boolean is never dropped / stringified oddly
     payload.price_on_request = form.price_on_request === true
@@ -1357,12 +1410,109 @@ export default function AdminProductsPage() {
             </section>
           )}
 
+          {/* Card display specs — exactly 4 optional ordered slots */}
+          <section className="border-t border-mist-100 pt-5">
+            <div className="mb-3">
+              <h3 className="font-semibold text-ink-900">مشخصات نمایشی کارت</h3>
+              <p className="mt-1 text-xs leading-6 text-ink-700/45">
+                تا چهار ردیف اختیاری برای کارت محصول (مثلاً ظرفیت، توان خروجی، …). عنوان و مقدار را آزادانه
+                بنویسید. ردیف‌های کاملاً خالی در کارت نشان داده نمی‌شوند.
+              </p>
+            </div>
+            <div className="space-y-2">
+              {cardSpecs.map((slot, idx) => (
+                <div
+                  key={`card-spec-${idx}`}
+                  className="grid gap-2 rounded-xl border border-mist-200 bg-mist-50/60 p-2.5 sm:grid-cols-[auto_1fr_1fr_auto]"
+                >
+                  <div className="flex items-center gap-1 sm:flex-col sm:justify-center">
+                    <span className="text-[11px] font-semibold text-ink-700/45">
+                      {faDigits(idx + 1)}
+                    </span>
+                    <div className="flex gap-0.5 sm:flex-col">
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-ink-700/50 transition hover:bg-white hover:text-ink-900 disabled:opacity-30"
+                        disabled={idx === 0}
+                        aria-label="جابه‌جایی به بالا"
+                        onClick={() => {
+                          if (idx === 0) return
+                          setCardSpecs((prev) => {
+                            const next = [...prev]
+                            ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                            return next
+                          })
+                        }}
+                      >
+                        <ChevronUp className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-ink-700/50 transition hover:bg-white hover:text-ink-900 disabled:opacity-30"
+                        disabled={idx === cardSpecs.length - 1}
+                        aria-label="جابه‌جایی به پایین"
+                        onClick={() => {
+                          if (idx >= cardSpecs.length - 1) return
+                          setCardSpecs((prev) => {
+                            const next = [...prev]
+                            ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                            return next
+                          })
+                        }}
+                      >
+                        <ChevronDown className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    </div>
+                  </div>
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-[11px] font-medium text-ink-700/55">عنوان</span>
+                    <input
+                      className="input"
+                      placeholder="مثلاً ظرفیت"
+                      value={slot.title}
+                      onChange={(e) => {
+                        const next = [...cardSpecs]
+                        next[idx] = { ...slot, title: e.target.value }
+                        setCardSpecs(next)
+                      }}
+                    />
+                  </label>
+                  <label className="min-w-0">
+                    <span className="mb-1 block text-[11px] font-medium text-ink-700/55">مقدار</span>
+                    <input
+                      className="input"
+                      placeholder="مثلاً ۱۰۰۰۰ میلی‌آمپر"
+                      value={slot.value}
+                      onChange={(e) => {
+                        const next = [...cardSpecs]
+                        next[idx] = { ...slot, value: e.target.value }
+                        setCardSpecs(next)
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="inline-flex h-10 w-10 cursor-pointer items-center justify-center self-end text-red-500 transition hover:bg-red-50"
+                    aria-label={`پاک کردن ردیف ${faDigits(idx + 1)}`}
+                    onClick={() => {
+                      const next = [...cardSpecs]
+                      next[idx] = { title: '', value: '' }
+                      setCardSpecs(next)
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* Attributes */}
           <section className="border-t border-mist-100 pt-5">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-ink-900">ویژگی‌ها</h3>
-                <p className="text-xs text-ink-700/45">مثل گارانتی، جنس، وزن…</p>
+                <p className="text-xs text-ink-700/45">مثل گارانتی، جنس، وزن… (صفحه جزئیات محصول)</p>
               </div>
               <button
                 type="button"

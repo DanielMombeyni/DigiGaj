@@ -112,7 +112,7 @@ function HomeSearchBar() {
   const showPanel = open && q.trim().length >= 2
 
   return (
-    <form ref={wrapRef} onSubmit={goSearch} className="relative mt-8 max-w-lg">
+    <form ref={wrapRef} onSubmit={goSearch} className="relative mt-4 max-w-lg md:mt-8">
       <div className="flex overflow-hidden rounded-2xl border border-white/15 bg-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)] backdrop-blur-md focus-within:border-copper-400/50">
         <input
           type="search"
@@ -123,7 +123,7 @@ function HomeSearchBar() {
           }}
           onFocus={() => q.trim().length >= 2 && setOpen(true)}
           placeholder="جستجوی محصول، برند یا مدل..."
-          className="min-w-0 flex-1 bg-transparent px-4 py-3.5 text-sm text-white outline-none placeholder:text-white/40"
+          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/40 md:px-4 md:py-3.5"
           autoComplete="off"
           aria-label="جستجوی محصول"
           aria-expanded={showPanel}
@@ -202,9 +202,12 @@ function HomeSearchBar() {
 
 function SkeletonGrid() {
   return (
-    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-5 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-72 animate-pulse rounded-2xl bg-mist-100" />
+        <div
+          key={i}
+          className="aspect-[3/4] animate-pulse rounded-2xl bg-mist-100 sm:aspect-auto sm:h-72"
+        />
       ))}
     </div>
   )
@@ -405,27 +408,27 @@ export default function HomePage() {
         ]}
       />
 
-      {/* Hero — full-bleed, brand-first */}
-      <section className="relative min-h-[88vh] overflow-hidden bg-hero-mesh text-white">
+      {/* Hero — full-bleed, brand-first; content-height on mobile, tall on md+ */}
+      <section className="relative overflow-hidden bg-hero-mesh text-white md:min-h-[88vh]">
         <div className="hero-noise absolute inset-0 opacity-[0.35]" aria-hidden />
         <div className="absolute inset-0" aria-hidden>
-          <div className="absolute -right-24 top-16 h-[28rem] w-[28rem] rounded-full bg-copper-400/20 blur-3xl animate-orb" />
-          <div className="absolute -left-20 bottom-10 h-[22rem] w-[22rem] rounded-full bg-sea-500/25 blur-3xl animate-orb-slow" />
-          <div className="absolute left-1/2 top-1/3 h-40 w-40 -translate-x-1/2 rounded-full bg-white/5 blur-2xl animate-pulse-soft" />
+          <div className="absolute -right-16 top-8 h-40 w-40 rounded-full bg-copper-400/20 blur-3xl animate-orb md:-right-24 md:top-16 md:h-[28rem] md:w-[28rem]" />
+          <div className="absolute -left-12 bottom-4 h-32 w-32 rounded-full bg-sea-500/25 blur-3xl animate-orb-slow md:-left-20 md:bottom-10 md:h-[22rem] md:w-[22rem]" />
+          <div className="absolute left-1/2 top-1/3 hidden h-40 w-40 -translate-x-1/2 rounded-full bg-white/5 blur-2xl animate-pulse-soft md:block" />
         </div>
 
-        <div className="relative mx-auto flex min-h-[88vh] max-w-6xl flex-col justify-end px-4 pb-16 pt-28 md:justify-center md:pb-24 md:pt-20">
-          <div className="max-w-xl animate-rise">
+        <div className="relative mx-auto flex max-w-6xl flex-col justify-end px-3 pb-8 pt-20 md:min-h-[88vh] md:justify-center md:px-4 md:pb-24 md:pt-20">
+          <div className="max-w-xl min-w-0 animate-rise">
             <BrandLogo size="hero" className="block" restClass="text-white" />
-            <h1 className="mt-5 text-xl font-medium leading-9 text-white/90 md:text-2xl md:leading-10">
+            <h1 className="mt-3 text-lg font-medium leading-8 text-white/90 md:mt-5 md:text-2xl md:leading-10">
               {settings.tagline || 'تکنولوژی روز، انتخاب مطمئن'}
             </h1>
-            <p className="mt-4 max-w-md text-sm leading-7 text-white/60 md:text-base md:leading-8">
+            <p className="mt-2 max-w-md text-sm leading-6 text-white/60 md:mt-4 md:text-base md:leading-8">
               از هدفون و ساعت هوشمند تا لوازم گیمینگ — خرید امن، ارسال سریع، پشتیبانی واقعی.
             </p>
             <HomeSearchBar />
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/products" className="btn-primary min-h-11 cursor-pointer px-7">
+            <div className="mt-4 flex flex-wrap gap-2 md:mt-6 md:gap-3">
+              <Link to="/products" className="btn-primary min-h-11 cursor-pointer px-5 md:px-7">
                 مشاهده محصولات
               </Link>
               <Link to="/categories" className="btn-ghost min-h-11 cursor-pointer">
@@ -458,24 +461,24 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-bounce-soft text-white/40" aria-hidden>
+        <div className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 animate-bounce-soft text-white/40 md:block" aria-hidden>
           <ChevronDown className="h-6 w-6" strokeWidth={1.5} />
         </div>
       </section>
 
       {/* Trust / benefits */}
-      <section className="relative z-10 -mt-8 px-4">
-        <Reveal className="reveal-scope mx-auto grid max-w-6xl gap-3 rounded-3xl border border-mist-200/80 bg-white/90 p-3 shadow-soft backdrop-blur sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:p-2">
+      <section className="relative z-10 -mt-5 px-3 md:-mt-8 md:px-4">
+        <Reveal className="reveal-scope mx-auto grid max-w-6xl gap-2 rounded-3xl border border-mist-200/80 bg-white/90 p-2 shadow-soft backdrop-blur sm:grid-cols-2 sm:gap-3 sm:p-3 lg:grid-cols-4 lg:gap-0 lg:p-2">
           {BENEFITS.map((b, i) => (
             <div
               key={b.title}
-              className="reveal flex gap-3 rounded-2xl px-4 py-5 transition hover:bg-mist-50"
+              className="reveal flex gap-3 rounded-2xl px-3 py-3 transition hover:bg-mist-50 sm:px-4 sm:py-5"
               style={{ transitionDelay: `${i * 80}ms` }}
             >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-copper-400">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-ink-950 text-copper-400 sm:h-11 sm:w-11">
                 {b.icon}
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="font-semibold text-ink-900">{b.title}</div>
                 <p className="mt-1 text-xs leading-6 text-ink-700/60">{b.text}</p>
               </div>
@@ -484,13 +487,15 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      {/* Featured */}
-      <section className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-        <Reveal className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+      {/* Featured — 2-col compact grid on mobile (≥320px) */}
+      <section className="mx-auto max-w-6xl px-3 py-8 md:px-4 md:py-20">
+        <Reveal className="mb-5 flex flex-col gap-3 sm:mb-10 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+          <div className="min-w-0">
             <p className="text-xs font-semibold tracking-widest text-copper-600">FEATURED</p>
-            <h2 className="mt-2 font-display text-3xl font-bold text-ink-900 md:text-4xl">محصولات ویژه</h2>
-            <p className="mt-2 text-sm text-ink-700/60">منتخب‌هایی که این هفته بیشتر دیده شدند</p>
+            <h2 className="mt-1.5 font-display text-2xl font-bold text-ink-900 md:mt-2 md:text-4xl">
+              محصولات ویژه
+            </h2>
+            <p className="mt-1.5 text-sm text-ink-700/60 md:mt-2">منتخب‌هایی که این هفته بیشتر دیده شدند</p>
           </div>
           <Link to="/products" className="cursor-pointer text-sm font-semibold text-sea-600 transition hover:text-copper-600">
             همه محصولات ←
@@ -499,9 +504,9 @@ export default function HomePage() {
         {loading ? (
           <SkeletonGrid />
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-5 lg:grid-cols-4">
             {featured.map((p) => (
-              <ProductCard key={p.id} product={p} />
+              <ProductCard key={p.id} product={p} density="home" />
             ))}
             {!featured.length && (
               <p className="col-span-full text-sm text-ink-700/50">هنوز محصول ویژه‌ای ثبت نشده است.</p>

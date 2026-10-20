@@ -164,6 +164,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     in_stock = serializers.BooleanField(read_only=True)
     has_options = serializers.BooleanField(read_only=True)
     min_price = serializers.SerializerMethodField()
+    card_specs = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -188,7 +189,13 @@ class ProductListSerializer(serializers.ModelSerializer):
             "category",
             "category_name",
             "primary_image",
+            "card_specs",
         )
+
+    def get_card_specs(self, obj):
+        from app.services.product_card_specs import extract_card_specs_from_specs
+
+        return extract_card_specs_from_specs(obj.specs)
 
     def get_primary_image(self, obj):
         # Use .all() so prefetch_related cache is reused (filter() forces N+1)
@@ -300,6 +307,12 @@ class ProductWriteSerializer(serializers.ModelSerializer):
     sizes = serializers.ListField(child=serializers.DictField(), required=False)
     variants = serializers.ListField(child=serializers.DictField(), required=False)
     attributes = serializers.ListField(child=serializers.DictField(), required=False)
+    card_specs = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
 
     class Meta:
         model = Product
@@ -320,6 +333,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "display_priority",
             "rating",
             "specs",
+            "card_specs",
             "meta",
             "colors",
             "sizes",
@@ -328,6 +342,11 @@ class ProductWriteSerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        from app.services.product_card_specs import (
+            merge_card_specs_into_specs,
+            normalize_card_specs,
+        )
+
         por = attrs.get(
             "price_on_request",
             getattr(self.instance, "price_on_request", False),
@@ -343,6 +362,14 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"price_toman": "قیمت باید بیشتر از صفر باشد"}
             )
+
+        if "card_specs" in attrs:
+            slots = normalize_card_specs(attrs.pop("card_specs"), raise_validation=True)
+            current_specs = attrs.get(
+                "specs",
+                getattr(self.instance, "specs", None) if self.instance else {},
+            )
+            attrs["specs"] = merge_card_specs_into_specs(current_specs, slots)
         return attrs
 
     def create(self, validated_data):

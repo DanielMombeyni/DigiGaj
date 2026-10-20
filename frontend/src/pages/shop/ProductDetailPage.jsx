@@ -259,10 +259,24 @@ export default function ProductDetailPage() {
           </dl>
         )}
 
-        {product.specs && Object.keys(product.specs).length > 0 && !(product.attributes || []).length && (
+        {product.specs &&
+          Object.entries(product.specs).some(
+            ([k, v]) =>
+              k !== 'card_display' &&
+              k !== 'card_specs' &&
+              (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'),
+          ) &&
+          !(product.attributes || []).length && (
           <dl className="mt-12 space-y-1 rounded-2xl border border-mist-200 bg-white p-5 text-sm shadow-soft">
             <div className="mb-3 font-semibold text-ink-900">مشخصات</div>
-            {Object.entries(product.specs).map(([k, v]) => (
+            {Object.entries(product.specs)
+              .filter(
+                ([k, v]) =>
+                  k !== 'card_display' &&
+                  k !== 'card_specs' &&
+                  (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'),
+              )
+              .map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4 border-b border-mist-100 py-2.5 last:border-0">
                 <dt className="text-ink-700/50">{k}</dt>
                 <dd className="font-medium text-ink-900">{String(v)}</dd>

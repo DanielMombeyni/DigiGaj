@@ -5,7 +5,8 @@ const SIZES = {
   sm: 'text-sm font-extrabold',
   md: 'text-xl font-extrabold',
   lg: 'text-2xl font-extrabold',
-  hero: 'text-5xl font-extrabold md:text-6xl lg:text-7xl',
+  // Homepage-only size today — keep desktop large; compact on narrow phones
+  hero: 'text-3xl font-extrabold sm:text-4xl md:text-6xl lg:text-7xl',
 }
 
 /**

@@ -27,6 +27,10 @@ function roundUp(n, step = PRICE_STEP) {
   return Math.ceil(n / step) * step
 }
 
+function roundDown(n, step = PRICE_STEP) {
+  return Math.floor(n / step) * step
+}
+
 function buildParams(args) {
   return buildProductListParams(args)
 }
@@ -36,12 +40,42 @@ function parsePriceParam(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
+function clampPrice(n, floor, ceil) {
+  if (!Number.isFinite(n)) return floor
+  return Math.min(ceil, Math.max(floor, n))
+}
+
+/** Build slider bounds from API min/max (toman). */
+function boundsFromStats(rawMin, rawMax) {
+  const minN = Number(rawMin)
+  const maxN = Number(rawMax)
+  if (!Number.isFinite(minN) || !Number.isFinite(maxN) || minN <= 0 || maxN <= 0) {
+    return { floor: 0, ceil: 0, mode: 'none' }
+  }
+  if (minN === maxN) {
+    return { floor: minN, ceil: maxN, mode: 'single' }
+  }
+  let floor = roundDown(minN)
+  let ceil = roundUp(maxN)
+  if (ceil <= floor) {
+    return { floor: minN, ceil: maxN, mode: 'single' }
+  }
+  if (ceil - floor < PRICE_STEP) {
+    return { floor: minN, ceil: maxN, mode: 'single' }
+  }
+  return { floor, ceil, mode: 'range' }
+}
+
 export default function ProductsPage() {
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState({ results: [], count: 0 })
   const [listError, setListError] = useState('')
   const [categories, setCategories] = useState([])
-  const [priceBounds, setPriceBounds] = useState({ floor: 0, ceil: DEFAULT_CEIL })
+  const [priceBounds, setPriceBounds] = useState({
+    floor: 0,
+    ceil: DEFAULT_CEIL,
+    mode: 'range',
+  })
   const [q, setQ] = useState(() => params.get('search') || '')
   const [category, setCategory] = useState(() => params.get('category') || '')
   const [priceRange, setPriceRange] = useState([0, DEFAULT_CEIL])
@@ -52,57 +86,102 @@ export default function ProductsPage() {
   const [boundsReady, setBoundsReady] = useState(false)
   const [page, setPage] = useState(() => Math.max(1, Number(params.get('page') || 1) || 1))
   const fetchGen = useRef(0)
+  const boundsGen = useRef(0)
+  /** 'reset' after user category change; 'preserve' on load / back-forward. */
+  const priceBoundsIntentRef = useRef('preserve')
 
   const debouncedQ = useDebounce(q, 300)
   const debouncedRange = useDebounce(priceRange, 400)
 
   const urlMin = params.get('min_price') || ''
   const urlMax = params.get('max_price') || ''
-  const apiMin = boundsReady
+  const canFilterPrice = boundsReady && priceBounds.mode === 'range'
+  const apiMin = canFilterPrice
     ? debouncedRange[0] > priceBounds.floor
       ? String(debouncedRange[0])
       : ''
-    : urlMin
-  const apiMax = boundsReady
+    : boundsReady
+      ? ''
+      : urlMin
+  const apiMax = canFilterPrice
     ? debouncedRange[1] < priceBounds.ceil
       ? String(debouncedRange[1])
       : ''
-    : urlMax
+    : boundsReady
+      ? ''
+      : urlMax
 
   const paramKey = params.toString()
 
+  const setCategoryFromUser = (next) => {
+    priceBoundsIntentRef.current = 'reset'
+    setCategory(next)
+  }
+
   useEffect(() => {
     let cancelled = false
-    Promise.all([shopApi.categories({ page_size: 100 }), shopApi.productPriceStats()])
-      .then(([catRes, statsRes]) => {
+    shopApi
+      .categories({ page_size: 100 })
+      .then((catRes) => {
         if (cancelled) return
         const list = catRes.data.results || catRes.data
         setCategories(Array.isArray(list) ? list.filter((c) => c.is_active !== false) : [])
-
-        const floor = 0
-        const rawCeil = statsRes.data?.max_price || DEFAULT_CEIL
-        const ceil = Math.max(roundUp(rawCeil), PRICE_STEP)
-
-        setPriceBounds({ floor, ceil })
-        setPriceRange([
-          parsePriceParam(params.get('min_price'), floor),
-          parsePriceParam(params.get('max_price'), ceil),
-        ])
-        setBoundsReady(true)
       })
       .catch(() => {
-        if (!cancelled) setBoundsReady(true)
+        if (!cancelled) setCategories([])
       })
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Category-scoped price bounds (full matching set — not the current page).
+  useEffect(() => {
+    const gen = ++boundsGen.current
+    setBoundsReady(false)
+    shopApi
+      .productPriceStats(category ? { category } : {})
+      .then((statsRes) => {
+        if (gen !== boundsGen.current) return
+        const payload = statsRes.data || {}
+        const nextBounds = boundsFromStats(payload.min_price, payload.max_price)
+        const intent = priceBoundsIntentRef.current
+        priceBoundsIntentRef.current = 'preserve'
+
+        setPriceBounds(nextBounds)
+
+        if (nextBounds.mode === 'none') {
+          setPriceRange([0, 0])
+        } else if (intent === 'reset' || nextBounds.mode === 'single') {
+          setPriceRange([nextBounds.floor, nextBounds.ceil])
+        } else {
+          const urlLo = parsePriceParam(params.get('min_price'), nextBounds.floor)
+          const urlHi = parsePriceParam(params.get('max_price'), nextBounds.ceil)
+          let lo = clampPrice(urlLo, nextBounds.floor, nextBounds.ceil)
+          let hi = clampPrice(urlHi, nextBounds.floor, nextBounds.ceil)
+          if (lo > hi) {
+            lo = nextBounds.floor
+            hi = nextBounds.ceil
+          }
+          setPriceRange([lo, hi])
+        }
+        setBoundsReady(true)
+      })
+      .catch(() => {
+        if (gen !== boundsGen.current) return
+        priceBoundsIntentRef.current = 'preserve'
+        setPriceBounds({ floor: 0, ceil: DEFAULT_CEIL, mode: 'range' })
+        setBoundsReady(true)
+      })
+  }, [category]) // eslint-disable-line react-hooks/exhaustive-deps -- intentional: refetch bounds on category only
 
   useEffect(() => {
     if (!categories.length || !category) return
     const ok = categories.some((c) => String(c.id) === String(category))
-    if (!ok) setCategory('')
+    if (!ok) {
+      priceBoundsIntentRef.current = 'reset'
+      setCategory('')
+    }
   }, [categories, category])
 
   useEffect(() => {
@@ -126,12 +205,18 @@ export default function ProductsPage() {
     }).toString()
     if (fromUrl === fromState) return
     setQ(params.get('search') || '')
-    setCategory(params.get('category') || '')
+    const nextCat = params.get('category') || ''
+    if (nextCat !== category) {
+      priceBoundsIntentRef.current = 'preserve'
+      setCategory(nextCat)
+    }
     setPage(Math.max(1, Number(params.get('page') || 1) || 1))
-    if (boundsReady) {
+    if (boundsReady && priceBounds.mode === 'range') {
+      const lo = parsePriceParam(params.get('min_price'), priceBounds.floor)
+      const hi = parsePriceParam(params.get('max_price'), priceBounds.ceil)
       setPriceRange([
-        parsePriceParam(params.get('min_price'), priceBounds.floor),
-        parsePriceParam(params.get('max_price'), priceBounds.ceil),
+        clampPrice(lo, priceBounds.floor, priceBounds.ceil),
+        clampPrice(hi, priceBounds.floor, priceBounds.ceil),
       ])
     }
     setOrdering(params.get('ordering') || '')
@@ -202,22 +287,25 @@ export default function ProductsPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize) || 1)
 
   const priceFiltered =
-    boundsReady &&
+    canFilterPrice &&
     (debouncedRange[0] > priceBounds.floor || debouncedRange[1] < priceBounds.ceil)
 
   const searchActive = Boolean(debouncedQ.trim())
 
   const clearFilters = () => {
+    priceBoundsIntentRef.current = 'reset'
     setQ('')
-    setCategory('')
-    setPriceRange([priceBounds.floor, priceBounds.ceil])
     setOrdering('')
     setFeatured(false)
     setPage(1)
     setListError('')
+    if (category) {
+      setCategory('')
+    } else if (priceBounds.mode === 'range') {
+      setPriceRange([priceBounds.floor, priceBounds.ceil])
+    }
   }
 
-  /** Any filter/sort/search that should show clear-all (includes search-only). */
   const hasClearableState = useMemo(
     () => Boolean(searchActive || category || priceFiltered || ordering || featured),
     [searchActive, category, priceFiltered, ordering, featured],
@@ -255,9 +343,10 @@ export default function ProductsPage() {
 
   const removeChip = (key) => {
     if (key === 'search') setQ('')
-    else if (key === 'category') setCategory('')
-    else if (key === 'price') setPriceRange([priceBounds.floor, priceBounds.ceil])
-    else if (key === 'featured') setFeatured(false)
+    else if (key === 'category') setCategoryFromUser('')
+    else if (key === 'price' && priceBounds.mode === 'range') {
+      setPriceRange([priceBounds.floor, priceBounds.ceil])
+    } else if (key === 'featured') setFeatured(false)
     else if (key === 'ordering') setOrdering('')
   }
 
@@ -316,9 +405,7 @@ export default function ProductsPage() {
             فیلترها
             {panelFiltersActive && (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-copper-500 px-1.5 text-[10px] font-bold text-white">
-                {faDigits(
-                  [category, priceFiltered, featured].filter(Boolean).length,
-                )}
+                {faDigits([category, priceFiltered, featured].filter(Boolean).length)}
               </span>
             )}
           </button>
@@ -362,11 +449,12 @@ export default function ProductsPage() {
         onClose={() => setFiltersOpen(false)}
         categories={categories}
         category={category}
-        onCategoryChange={setCategory}
+        onCategoryChange={setCategoryFromUser}
         priceBounds={priceBounds}
         priceRange={priceRange}
         onPriceChange={setPriceRange}
         boundsReady={boundsReady}
+        priceStep={PRICE_STEP}
         featured={featured}
         onFeaturedChange={setFeatured}
         onClearAll={clearFilters}

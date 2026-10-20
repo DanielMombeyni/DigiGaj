@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Star, X } from 'lucide-react'
 import CategoryFilterTree from '@/components/shop/CategoryFilterTree'
 import PriceRangeSlider from '@/components/shop/PriceRangeSlider'
-import { cn } from '@/utils/format'
+import { cn, toman } from '@/utils/format'
 
 /**
  * Unified Concept B filter surface:
@@ -21,6 +21,7 @@ export default function ProductsFilterPanel({
   priceRange,
   onPriceChange,
   boundsReady,
+  priceStep = 100_000,
   featured,
   onFeaturedChange,
   onClearAll,
@@ -117,17 +118,25 @@ export default function ProductsFilterPanel({
 
           <section className="mt-5 min-w-0 border-t border-mist-100 pt-5">
             <h3 className="label mb-2">بازه قیمت (تومان)</h3>
-            {boundsReady ? (
+            {!boundsReady ? (
+              <div className="mt-2 h-9 animate-pulse rounded-xl bg-mist-100" />
+            ) : priceBounds.mode === 'none' ? (
+              <p className="mt-1 text-sm leading-6 text-ink-700/55">
+                در این دسته محصولی با قیمت مشخص وجود ندارد؛ فیلتر قیمت غیرفعال است.
+              </p>
+            ) : priceBounds.mode === 'single' ? (
+              <p className="mt-1 rounded-xl border border-mist-200 bg-mist-50 px-3 py-2.5 text-sm font-medium tabular-nums text-ink-900">
+                قیمت یکسان: {toman(priceBounds.floor)}
+              </p>
+            ) : (
               <PriceRangeSlider
                 min={priceBounds.floor}
                 max={priceBounds.ceil}
                 valueMin={priceRange[0]}
                 valueMax={priceRange[1]}
-                step={100_000}
+                step={priceStep}
                 onChange={onPriceChange}
               />
-            ) : (
-              <div className="mt-2 h-9 animate-pulse rounded-xl bg-mist-100" />
             )}
           </section>
 

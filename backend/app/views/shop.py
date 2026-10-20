@@ -79,6 +79,7 @@ from app.services.order_service import OrderService
 from app.services.payment_service import PaymentService
 from app.payment.utils import detect_platform
 from app.filters import ProductFilter, ProductOrderingFilter
+from app.filters.product import category_with_descendants
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -566,23 +567,44 @@ def admin_store_config(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def product_price_stats(request):
-    """Cheap min/max for filter UI — uses display_price (card min_price semantics)."""
+    """
+    Min/max display prices for the filter slider.
+
+    Scope matches list filtering: active products, optional category including
+    descendants. Bounds ignore price_on_request and non-positive display prices.
+    Does not apply the caller's min_price/max_price filters (slider limits must
+    stay stable while the user adjusts the range).
+    """
     qs = Product.objects.filter(is_active=True)
     category = (request.query_params.get("category") or "").strip()
     if category:
         if category.isdigit():
-            qs = qs.filter(category_id=int(category))
+            qs = qs.filter(category_id__in=category_with_descendants(int(category)))
         else:
-            qs = qs.filter(category__slug=category)
-    qs = annotate_display_price(qs.filter(price_on_request=False))
+            cat = Category.objects.filter(slug=category).only("id").first()
+            if cat is None:
+                qs = qs.none()
+            else:
+                qs = qs.filter(category_id__in=category_with_descendants(cat.id))
+
+    qs = annotate_display_price(qs.filter(price_on_request=False)).exclude(
+        Q(**{f"{DISPLAY_PRICE_ANNOTATION}__isnull": True})
+        | Q(**{f"{DISPLAY_PRICE_ANNOTATION}__lte": 0})
+    )
     agg = qs.aggregate(
         min_price=Min(DISPLAY_PRICE_ANNOTATION),
         max_price=Max(DISPLAY_PRICE_ANNOTATION),
+        priced_count=Count("id"),
     )
+    min_price = agg["min_price"]
+    max_price = agg["max_price"]
+    has_priced = min_price is not None and max_price is not None
     return Response(
         {
-            "min_price": agg["min_price"] or 0,
-            "max_price": agg["max_price"] or 0,
+            "min_price": int(min_price) if has_priced else None,
+            "max_price": int(max_price) if has_priced else None,
+            "priced_count": int(agg["priced_count"] or 0),
+            "has_priced_products": has_priced,
         }
     )
 
