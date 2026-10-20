@@ -1,5 +1,6 @@
 from .category import Category
 from .product import (
+    DISPLAY_PRIORITY_MAX,
     Product,
     ProductImage,
     ProductColor,
@@ -17,12 +18,14 @@ from .customer_address import CustomerAddress, MAX_CUSTOMER_ADDRESSES
 from .sms_provider import SmsProviderConfig
 from .sms_template import SmsTemplate
 from .sms_log import SmsLog
+from .sms_dispatch_claim import SmsDispatchClaim
 from .staff import StaffRole
 from .support import SupportTicket, TicketMessage
 from .email import EmailTemplate
 
 __all__ = [
     "Category",
+    "DISPLAY_PRIORITY_MAX",
     "Product",
     "ProductImage",
     "ProductColor",
@@ -44,6 +47,7 @@ __all__ = [
     "SmsProviderConfig",
     "SmsTemplate",
     "SmsLog",
+    "SmsDispatchClaim",
     "StaffRole",
     "SupportTicket",
     "TicketMessage",

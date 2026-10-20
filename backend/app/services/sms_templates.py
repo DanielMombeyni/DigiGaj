@@ -30,31 +30,66 @@ PLACEHOLDERS = [
     {"key": "amount", "label": "مبلغ"},
 ]
 
+MANUAL_SEND_MAX_RECIPIENTS = 100
+
 _TOKEN_RE = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}|\{([a-zA-Z0-9_]+)\}")
 
 SAMPLE_BY_EVENT = {
-    "login_otp": {"code": "123456", "name": "علی رضایی", "phone": "09120000000"},
-    "signup_otp": {"code": "123456", "name": "علی رضایی", "phone": "09120000000"},
+    "login_otp": {"code": "***", "name": "علی رضایی", "phone": "09120000000"},
+    "signup_otp": {"code": "***", "name": "علی رضایی", "phone": "09120000000"},
     "forgot_password": {
         "name": "علی رضایی",
-        "link": "https://example.com/reset-password/sample",
-        "code": "sample-token",
+        "link": "***",
+        "code": "***",
         "phone": "09120000000",
+    },
+    "order_created": {
+        "order_id": "GS-1001",
+        "order_number": "GS-1001",
+        "status": "در انتظار پرداخت",
+        "name": "علی رضایی",
+        "customer_name": "علی رضایی",
+        "phone": "09120000000",
+        "amount": "1500000",
     },
     "order_status_changed": {
         "order_id": "GS-1001",
         "status": "ارسال‌شده",
         "name": "علی رضایی",
         "phone": "09120000000",
+        "amount": "1500000",
     },
-    "custom": {"name": "علی رضایی", "code": "123456", "phone": "09120000000"},
+    "order_paid": {
+        "order_id": "GS-1001",
+        "status": "پرداخت‌شده",
+        "name": "علی رضایی",
+        "phone": "09120000000",
+        "amount": "1500000",
+    },
+    "order_shipped": {
+        "order_id": "GS-1001",
+        "status": "ارسال‌شده",
+        "name": "علی رضایی",
+        "phone": "09120000000",
+    },
+    "order_delivered": {
+        "order_id": "GS-1001",
+        "status": "تحویل‌شده",
+        "name": "علی رضایی",
+        "phone": "09120000000",
+    },
+    "custom": {"name": "علی رضایی", "code": "***", "phone": "09120000000"},
 }
 
 EVENT_TARGETS = {
     "login_otp": ("customer", "all"),
     "signup_otp": ("customer", "all"),
     "forgot_password": ("customer", "admin", "all"),
+    "order_created": ("customer", "admin", "all"),
     "order_status_changed": ("customer", "admin", "all"),
+    "order_paid": ("customer", "admin", "all"),
+    "order_shipped": ("customer", "admin", "all"),
+    "order_delivered": ("customer", "admin", "all"),
 }
 
 
@@ -100,6 +135,15 @@ def signal_ready() -> bool:
 
 
 def serialize_template(row: SmsTemplate) -> dict:
+    keys = list(row.param_keys or [])
+    bindings = dict(row.param_bindings or {})
+    from app.services.sms_params import default_source_for_param
+
+    manual_keys = []
+    for k in keys:
+        src = bindings.get(k) or default_source_for_param(k)
+        if src == "manual":
+            manual_keys.append(k)
     return {
         "id": row.id,
         "key": row.key,
@@ -110,9 +154,12 @@ def serialize_template(row: SmsTemplate) -> dict:
         "target_label": row.get_target_user_display(),
         "mode": row.mode,
         "mode_label": row.get_mode_display(),
-        "body_text": row.body_text,
+        "body_text": row.body_text if row.mode == SmsTemplate.Mode.TEXT else "",
         "pattern_id": row.pattern_id,
-        "param_keys": list(row.param_keys or []),
+        "param_keys": keys,
+        "param_bindings": bindings,
+        "manual_param_keys": manual_keys,
+        # Raw samples for edit forms; previews use redact_params separately.
         "sample_params": dict(row.sample_params or {}),
         "notes": row.notes,
         "is_enabled": row.is_enabled,
@@ -137,8 +184,14 @@ def catalog_payload() -> dict:
         except Exception:
             logger.exception("Signal balance check failed")
             balance_error = "استعلام اعتبار ناموفق بود."
+    from app.services.sms_params import (
+        MANUAL_SEND_MAX_RECIPIENTS,
+        catalog_param_sources,
+    )
+
     return {
         "placeholders": list(PLACEHOLDERS),
+        "param_sources": catalog_param_sources(),
         "modes": [{"key": k, "label": v} for k, v in SmsTemplate.Mode.choices],
         "events": [{"key": k, "label": v} for k, v in SmsTemplate.Event.choices],
         "targets": [{"key": k, "label": v} for k, v in SmsTemplate.Target.choices],
@@ -148,6 +201,7 @@ def catalog_payload() -> dict:
         "balance_error": balance_error,
         "docs_url": SignalSmsDriver.docs_url,
         "from_hint": str(getattr(settings, "SIGNAL_SMS_FROM", "") or ""),
+        "manual_send_max_recipients": MANUAL_SEND_MAX_RECIPIENTS,
     }
 
 
@@ -160,13 +214,15 @@ def _unique_key(name: str) -> str:
 
 
 def _parse_param_keys(raw: Any) -> list[str]:
+    from app.services.sms_params import validate_param_keys
+
     if raw is None:
         return []
     if isinstance(raw, str):
         parts = re.split(r"[,|\s]+", raw.strip())
-        return [p.strip() for p in parts if p.strip()]
+        return validate_param_keys([p.strip() for p in parts if p.strip()])
     if isinstance(raw, (list, tuple)):
-        return [str(p).strip() for p in raw if str(p).strip()]
+        return validate_param_keys([str(p).strip() for p in raw if str(p).strip()])
     raise ValidationError({"param_keys": "فرمت پارامترها نامعتبر است."})
 
 
@@ -178,7 +234,11 @@ def _parse_sample_params(raw: Any) -> dict:
     raise ValidationError({"sample_params": "نمونه پارامتر باید آبجکت باشد."})
 
 
-def _validate_mode_payload(mode: str, payload: dict) -> tuple[str, int | None, list, dict]:
+def _validate_mode_payload(
+    mode: str, payload: dict
+) -> tuple[str, int | None, list, dict, dict]:
+    from app.services.sms_params import validate_param_bindings
+
     valid = {c.value for c in SmsTemplate.Mode}
     if mode not in valid:
         raise ValidationError({"mode": "نوع قالب نامعتبر است."})
@@ -194,19 +254,22 @@ def _validate_mode_payload(mode: str, payload: dict) -> tuple[str, int | None, l
 
     param_keys = _parse_param_keys(payload.get("param_keys"))
     sample_params = _parse_sample_params(payload.get("sample_params"))
+    param_bindings = validate_param_bindings(payload.get("param_bindings"), param_keys)
 
     if mode == SmsTemplate.Mode.TEXT:
         if not body:
             raise ValidationError({"body_text": "متن پیامک برای قالب متنی الزامی است."})
-        return body, None, param_keys, sample_params
+        # Text mode does not store a Signal pattern body duplicate requirement.
+        return body, None, param_keys, sample_params, param_bindings
 
+    # Pattern: text lives in Signal panel — DigiGaj must not require body_text.
     if not pattern_id:
         raise ValidationError({"pattern_id": "شناسه الگوی سیگنال الزامی است."})
     if not param_keys:
         raise ValidationError(
             {"param_keys": "نام پارامترهای الگو را دقیقاً مثل پنل سیگنال، با ویرگول وارد کنید."}
         )
-    return body, pattern_id, param_keys, sample_params
+    return "", pattern_id, param_keys, sample_params, param_bindings
 
 
 def create_template(payload: dict) -> SmsTemplate:
@@ -216,7 +279,9 @@ def create_template(payload: dict) -> SmsTemplate:
     if not name:
         raise ValidationError({"name": "نام قالب الزامی است."})
     mode = str(payload.get("mode") or SmsTemplate.Mode.TEXT).strip()
-    body, pattern_id, param_keys, sample_params = _validate_mode_payload(mode, payload)
+    body, pattern_id, param_keys, sample_params, param_bindings = _validate_mode_payload(
+        mode, payload
+    )
     event = _parse_choice(
         payload.get("event"), SmsTemplate.Event, "event", SmsTemplate.Event.CUSTOM
     )
@@ -236,6 +301,7 @@ def create_template(payload: dict) -> SmsTemplate:
         body_text=_clean_text(body),
         pattern_id=pattern_id,
         param_keys=param_keys,
+        param_bindings=param_bindings,
         sample_params=sample_params,
         notes=_clean_text(payload.get("notes") or "", limit=255),
         is_enabled=bool(payload.get("is_enabled", True)),
@@ -274,7 +340,12 @@ def update_template(row: SmsTemplate, payload: dict) -> SmsTemplate:
         row.is_enabled = bool(payload["is_enabled"])
 
     mode_changing = "mode" in payload or "body_text" in payload or "pattern_id" in payload
-    if mode_changing or "param_keys" in payload or "sample_params" in payload:
+    if (
+        mode_changing
+        or "param_keys" in payload
+        or "sample_params" in payload
+        or "param_bindings" in payload
+    ):
         mode = str(payload.get("mode") or row.mode).strip()
         merged = {
             "body_text": payload["body_text"] if "body_text" in payload else row.body_text,
@@ -283,12 +354,18 @@ def update_template(row: SmsTemplate, payload: dict) -> SmsTemplate:
             "sample_params": payload["sample_params"]
             if "sample_params" in payload
             else row.sample_params,
+            "param_bindings": payload["param_bindings"]
+            if "param_bindings" in payload
+            else row.param_bindings,
         }
-        body, pattern_id, param_keys, sample_params = _validate_mode_payload(mode, merged)
+        body, pattern_id, param_keys, sample_params, param_bindings = _validate_mode_payload(
+            mode, merged
+        )
         row.mode = mode
         row.body_text = body
         row.pattern_id = pattern_id
         row.param_keys = param_keys
+        row.param_bindings = param_bindings
         row.sample_params = sample_params
 
     from django.db import transaction
@@ -432,14 +509,22 @@ def sample_context(event: str) -> dict[str, str]:
 
 
 def preview_template(row: SmsTemplate, params: dict | None = None) -> dict:
+    from app.services.sms_params import redact_params
+
     merged = {**sample_context(row.event), **dict(row.sample_params or {}), **(params or {})}
     if row.mode == SmsTemplate.Mode.PATTERN:
         keys = list(row.param_keys or []) or list(merged.keys())
         pattern_params = build_pattern_parameters(keys, merged, event=row.event)
-        rendered = " ".join(f"{key}={pattern_params.get(key, '')}" for key in keys)
+        safe_params = redact_params(pattern_params)
+        rendered = " ".join(f"{key}={safe_params.get(key, '')}" for key in keys)
     else:
         rendered = render_text(row.body_text, merged)
-    return {"text": rendered, "context": {k: str(v) for k, v in merged.items()}}
+        # Avoid leaking sample secrets into preview text for OTP-like events
+        for sensitive in ("code", "otp", "token", "link"):
+            val = str(merged.get(sensitive) or "")
+            if val and val not in {"***", ""} and val in rendered:
+                rendered = rendered.replace(val, "***")
+    return {"text": rendered, "context": redact_params(merged)}
 
 
 def _parse_choice(raw, choices, field: str, default: str) -> str:
@@ -482,9 +567,25 @@ def send_quick(
     pattern_id: int | str | None = None,
     parameters: dict | None = None,
 ) -> dict:
-    numbers = _normalize_phones(phones)
+    from app.services.sms_params import MANUAL_SEND_MAX_RECIPIENTS, normalize_phone, phone_ok
+
+    numbers = [normalize_phone(p) for p in _normalize_phones(phones)]
+    numbers = [p for p in numbers if p]
     if not numbers:
         raise ValidationError({"phones": "حداقل یک شماره موبایل وارد کنید."})
+    if len(numbers) > MANUAL_SEND_MAX_RECIPIENTS:
+        raise ValidationError(
+            {
+                "phones": (
+                    f"حداکثر {MANUAL_SEND_MAX_RECIPIENTS} شماره در هر درخواست مجاز است."
+                )
+            }
+        )
+    bad = [p for p in numbers if not phone_ok(p)]
+    if bad:
+        raise ValidationError(
+            {"phones": f"شماره نامعتبر: {', '.join(bad[:5])}"}
+        )
 
     client = get_signal_client()
     try:
@@ -523,11 +624,21 @@ def send_template_test(
     *,
     params: dict | None = None,
 ) -> dict:
-    phone = str(phone or "").strip()
-    if not phone:
-        raise ValidationError({"phone": "شماره موبایل الزامی است."})
+    from app.services.sms_params import (
+        build_parameters_from_bindings,
+        normalize_phone,
+        phone_ok,
+        redact_params,
+    )
+    from app.services.sms_dispatch import _log
+
+    phone = normalize_phone(phone)
+    if not phone_ok(phone):
+        raise ValidationError({"phone": "شماره موبایل معتبر نیست (فرمت 09xxxxxxxxx)."})
     if not row.is_enabled:
         raise ValidationError({"detail": "این قالب غیرفعال است."})
+    if not signal_ready():
+        raise ValidationError({"detail": "سرویس سیگنال آماده نیست."})
 
     client = get_signal_client()
     merged = {**(row.sample_params or {}), **(params or {})}
@@ -542,14 +653,26 @@ def send_template_test(
                 raise ValidationError(
                     {"param_keys": "نام پارامترهای الگو را با ویرگول وارد کنید."}
                 )
-            pattern_params = build_pattern_parameters(keys, merged, event=row.event)
+            pattern_params = build_parameters_from_bindings(
+                keys,
+                row.param_bindings or {},
+                context=merged,
+                manual_params=params or {},
+                require_all=True,
+            )
             data = client.send_pattern(phone, row.pattern_id, pattern_params)
-            return {"mode": "pattern", "result": data, "parameters": pattern_params}
+            _log(phone, "template_test", True, "", row)
+            return {
+                "mode": "pattern",
+                "result": data,
+                "parameters": redact_params(pattern_params),
+            }
 
         text = render_text(row.body_text, merged)
         if not text.strip():
             raise ValidationError({"body_text": "متن قالب خالی است."})
         data = client.send_sms(phone, text)
+        _log(phone, "template_test", True, "", row)
         return {"mode": "text", "result": data}
     except SignalSmsError:
         raise
@@ -563,3 +686,263 @@ def send_template_test(
 def fetch_balance() -> dict:
     client = get_signal_client()
     return client.check_balance()
+
+
+def send_template_to_users(
+    *,
+    template: SmsTemplate,
+    user_ids: list[int],
+    actor,
+    manual_params: dict | None = None,
+    client_request_id: str = "",
+) -> dict:
+    """
+    Manual send through a saved template to selected users.
+    Enforces max recipients, phone validation, and per-recipient outcomes.
+    """
+    from django.contrib.auth import get_user_model
+    from django.core.cache import cache
+
+    from app.services.sms_params import (
+        MANUAL_SEND_MAX_RECIPIENTS,
+        MANUAL_SEND_RATE_LIMIT,
+        MANUAL_SEND_RATE_WINDOW,
+        atomic_cache_add,
+        atomic_rate_increment,
+        build_parameters_from_bindings,
+        phone_ok,
+        recipient_dict_from_user,
+        redact_params,
+        sanitize_manual_params,
+        validate_client_request_id,
+    )
+    from app.services.sms_dispatch import _log
+
+    User = get_user_model()
+
+    if not template.is_enabled:
+        raise ValidationError({"template_id": "قالب انتخاب‌شده غیرفعال است."})
+    if template.mode == SmsTemplate.Mode.PATTERN and not template.pattern_id:
+        raise ValidationError({"template_id": "شناسه الگوی سیگنال برای این قالب تنظیم نشده."})
+    if template.mode == SmsTemplate.Mode.TEXT and not str(template.body_text or "").strip():
+        raise ValidationError({"template_id": "متن قالب خالی است."})
+    if not signal_ready():
+        raise ValidationError({"detail": "سرویس سیگنال آماده نیست."})
+
+    req_id = validate_client_request_id(client_request_id)
+    actor_id = getattr(actor, "pk", None) or 0
+    result_key = f"sms:manual:result:{actor_id}:{req_id}"
+    lock_key = f"sms:manual:lock:{actor_id}:{req_id}"
+
+    cached = cache.get(result_key)
+    if isinstance(cached, dict) and "results" in cached:
+        out = dict(cached)
+        out["duplicate"] = True
+        return out
+
+    # Deduplicate while preserving order
+    seen: set[int] = set()
+    ids: list[int] = []
+    for raw in user_ids or []:
+        try:
+            uid = int(raw)
+        except (TypeError, ValueError):
+            raise ValidationError({"user_ids": "شناسه کاربر نامعتبر است."})
+        if uid in seen:
+            continue
+        seen.add(uid)
+        ids.append(uid)
+
+    if not ids:
+        raise ValidationError({"user_ids": "حداقل یک کاربر انتخاب کنید."})
+    if len(ids) > MANUAL_SEND_MAX_RECIPIENTS:
+        raise ValidationError(
+            {
+                "user_ids": (
+                    f"حداکثر {MANUAL_SEND_MAX_RECIPIENTS} گیرنده در هر درخواست مجاز است."
+                )
+            }
+        )
+
+    keys = [str(k).strip() for k in (template.param_keys or []) if str(k).strip()]
+    bindings = dict(template.param_bindings or {})
+    from app.services.sms_params import manual_keys_for_template
+
+    manual_bound = manual_keys_for_template(keys, bindings)
+    cleaned_manual = sanitize_manual_params(
+        param_keys=keys,
+        bindings=bindings,
+        raw=manual_params,
+        require_values=bool(manual_bound),
+    )
+
+    if not atomic_cache_add(lock_key, "1", MANUAL_SEND_RATE_WINDOW):
+        cached_again = cache.get(result_key)
+        if isinstance(cached_again, dict) and "results" in cached_again:
+            out = dict(cached_again)
+            out["duplicate"] = True
+            return out
+        raise ValidationError(
+            {"detail": "این درخواست قبلاً ثبت شده یا در حال پردازش است."}
+        )
+
+    rate_key = f"sms:manual:rate:{actor_id}"
+    rate_count = atomic_rate_increment(
+        rate_key, window=MANUAL_SEND_RATE_WINDOW, limit=MANUAL_SEND_RATE_LIMIT
+    )
+    if rate_count > MANUAL_SEND_RATE_LIMIT:
+        cache.delete(lock_key)
+        raise ValidationError(
+            {"detail": "محدودیت نرخ ارسال دستی. کمی بعد دوباره تلاش کنید."}
+        )
+
+    users = {
+        u.id: u
+        for u in User.objects.filter(id__in=ids, is_staff=False)
+        .select_related("profile")
+        .only("id", "username", "first_name", "last_name")
+    }
+    missing = [i for i in ids if i not in users]
+    if missing:
+        cache.delete(lock_key)
+        raise ValidationError(
+            {"user_ids": f"کاربر(ان) نامعتبر: {', '.join(str(x) for x in missing[:10])}"}
+        )
+
+    batch_id = req_id
+    client = get_signal_client()
+    results: list[dict] = []
+    sent = 0
+    failed = 0
+
+    for uid in ids:
+        user = users[uid]
+        recipient = recipient_dict_from_user(user)
+        phone = recipient.get("phone") or ""
+        entry = {
+            "user_id": uid,
+            "username": user.get_username(),
+            "phone": phone,
+            "status": "failed",
+            "error": "",
+        }
+        if not phone_ok(phone):
+            entry["error"] = "شماره موبایل معتبر نیست."
+            failed += 1
+            _log(
+                phone or "-",
+                "manual_send",
+                False,
+                entry["error"],
+                template,
+                actor=actor,
+                batch_id=batch_id,
+                recipient_user=user,
+            )
+            results.append(entry)
+            continue
+
+        # Trusted identity/context only — manual values stay in cleaned_manual.
+        context = {
+            "name": recipient.get("name") or "",
+            "phone": phone,
+            "customer_name": recipient.get("name") or "",
+        }
+        try:
+            if template.mode == SmsTemplate.Mode.PATTERN:
+                params = build_parameters_from_bindings(
+                    keys,
+                    bindings,
+                    context=context,
+                    recipient=recipient,
+                    manual_params=cleaned_manual,
+                    require_all=True,
+                )
+                logger.info(
+                    "manual sms pattern batch=%s template=%s params=%s",
+                    batch_id,
+                    template.id,
+                    redact_params(params),
+                )
+                client.send_pattern(phone, template.pattern_id, params)
+            else:
+                render_ctx = {**context, **cleaned_manual, **recipient}
+                text = render_text(template.body_text, render_ctx)
+                if not text.strip():
+                    raise ValidationError({"body_text": "متن قالب پس از جایگذاری خالی است."})
+                client.send_sms(phone, text)
+            entry["status"] = "sent"
+            sent += 1
+            _log(
+                phone,
+                "manual_send",
+                True,
+                "",
+                template,
+                actor=actor,
+                batch_id=batch_id,
+                recipient_user=user,
+            )
+        except ValidationError as exc:
+            detail = getattr(exc, "detail", str(exc))
+            if isinstance(detail, dict):
+                msg = next(iter(detail.values()), "خطا")
+                if isinstance(msg, (list, tuple)):
+                    msg = msg[0] if msg else "خطا"
+                entry["error"] = str(msg)[:500]
+            else:
+                entry["error"] = str(detail)[:500]
+            failed += 1
+            _log(
+                phone,
+                "manual_send",
+                False,
+                entry["error"],
+                template,
+                actor=actor,
+                batch_id=batch_id,
+                recipient_user=user,
+            )
+        except SignalSmsError as exc:
+            entry["error"] = str(exc)[:500]
+            failed += 1
+            _log(
+                phone,
+                "manual_send",
+                False,
+                entry["error"],
+                template,
+                actor=actor,
+                batch_id=batch_id,
+                recipient_user=user,
+            )
+        except Exception:
+            logger.exception("manual sms failed user=%s", uid)
+            entry["error"] = "ارسال پیامک ناموفق بود."
+            failed += 1
+            _log(
+                phone,
+                "manual_send",
+                False,
+                entry["error"],
+                template,
+                actor=actor,
+                batch_id=batch_id,
+                recipient_user=user,
+            )
+        results.append(entry)
+
+    payload = {
+        "batch_id": batch_id,
+        "template_id": template.id,
+        "sent": sent,
+        "failed": failed,
+        "total": len(results),
+        "results": results,
+        "duplicate": False,
+    }
+    cache.set(result_key, payload, MANUAL_SEND_RATE_WINDOW)
+    # Keep lock until TTL so concurrent add() fails; duplicates read result_key.
+    return payload
+
+

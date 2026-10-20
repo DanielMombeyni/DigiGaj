@@ -3,14 +3,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
-from app.models import Order, PaymentGatewayConfig, Product, PurchaseTransaction
+from app.models import Order, PaymentGatewayConfig, PurchaseTransaction
 from app.payment.facade import PaymentFacade
 from app.payment.return_page import render_return_page
 from app.payment.utils import detect_platform
 from app.permissions import HasAdminPage
 from app.serializers import PurchaseTransactionSerializer
 from app.services.payment_gateway_service import PaymentGatewayService
-from app.services.payment_service import PaymentService
+from app.services.order_payment_access import (
+    parse_positive_quantity,
+    user_can_initiate_order_payment,
+)
+from app.services.payment_service import PaymentService, user_can_access_transaction
 
 
 def _parse_bool(value, default=False):
@@ -85,39 +89,39 @@ class PurchaseView(APIView):
         platform = request.data.get("platform") or detect_platform(request)
         order_id = request.data.get("order_id")
         product_id = request.data.get("product_id")
-        quantity = int(request.data.get("quantity") or 1)
-        amount_toman = request.data.get("amount_toman")
 
         if not gateway:
             return Response({"detail": "gateway الزامی است"}, status=400)
 
-        order = None
-        product = None
-        if order_id:
-            try:
-                order = Order.objects.get(pk=order_id)
-                if (
-                    order.user_id
-                    and order.user_id != request.user.id
-                    and not request.user.is_staff
-                ):
-                    return Response({"detail": "دسترسی ندارید"}, status=403)
-            except Order.DoesNotExist:
-                return Response({"detail": "سفارش یافت نشد"}, status=404)
-        elif product_id:
-            try:
-                product = Product.objects.get(pk=product_id, is_active=True)
-            except Product.DoesNotExist:
-                return Response({"detail": "محصول یافت نشد"}, status=404)
+        # Direct product purchase is disabled (no safe inventory reservation on this path).
+        if product_id and not order_id:
+            if "quantity" in request.data:
+                _qty, qty_err = parse_positive_quantity(request.data.get("quantity"))
+                if qty_err:
+                    return Response({"detail": qty_err}, status=400)
+            return Response(
+                {
+                    "detail": "خرید مستقیم محصول پشتیبانی نمی‌شود؛ از مسیر ثبت سفارش استفاده کنید"
+                },
+                status=400,
+            )
+
+        if not order_id:
+            return Response({"detail": "سفارش الزامی است"}, status=400)
+
+        try:
+            order = Order.objects.get(pk=order_id)
+        except Order.DoesNotExist:
+            return Response({"detail": "سفارش یافت نشد"}, status=404)
+
+        if not user_can_initiate_order_payment(request.user, order):
+            return Response({"detail": "دسترسی ندارید"}, status=403)
 
         data, err = PaymentService.create_purchase(
             request=request,
             gateway=gateway,
             order=order,
-            product=product,
-            quantity=quantity,
             platform=platform,
-            amount_toman=int(amount_toman) if amount_toman else None,
             mobile=request.data.get("mobile", ""),
             description=request.data.get("description", ""),
         )
@@ -127,14 +131,21 @@ class PurchaseView(APIView):
 
 
 class ConfirmView(APIView):
+    """Authenticated confirm for the TX owner (or staff). Gateway callbacks use CallbackView."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         tracking = request.data.get("tracking_number")
         if not tracking:
             return Response({"detail": "tracking_number الزامی است"}, status=400)
+        tx = PaymentService.get_transaction(str(tracking).strip())
+        if not tx:
+            return Response({"detail": "تراکنش یافت نشد"}, status=404)
+        if not user_can_access_transaction(request.user, tx):
+            return Response({"detail": "دسترسی ندارید"}, status=403)
         data, err = PaymentService.confirm_payment_by_tracking(
-            tracking, callback_data=request.data
+            tx.tracking_number, callback_data=request.data
         )
         if err:
             return Response({"detail": err}, status=400)
@@ -145,10 +156,12 @@ class StatusView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, tracking_number):
-        data = PaymentService.get_status(tracking_number)
-        if not data:
+        tx = PaymentService.get_transaction(tracking_number)
+        if not tx:
             return Response({"detail": "یافت نشد"}, status=404)
-        return Response(data)
+        if not user_can_access_transaction(request.user, tx):
+            return Response({"detail": "دسترسی ندارید"}, status=403)
+        return Response(PaymentService.serialize_status(tx))
 
 
 class CallbackView(APIView):
@@ -175,8 +188,22 @@ class CallbackView(APIView):
                 request, status="failed", tracking="", message="tracking یافت نشد"
             )
 
+        tx = PaymentService.get_transaction(str(tracking).strip())
+        if not tx:
+            return render_return_page(
+                request, status="failed", tracking=tracking, message="تراکنش یافت نشد"
+            )
+        route_provider = str(provider or "").strip().lower()
+        if route_provider and route_provider != str(tx.gateway or "").strip().lower():
+            return render_return_page(
+                request,
+                status="failed",
+                tracking=tracking,
+                message="درگاه callback با تراکنش مطابقت ندارد",
+            )
+
         data, err = PaymentService.confirm_payment_by_tracking(
-            tracking, callback_data=callback_data
+            tx.tracking_number, callback_data=callback_data
         )
         if err:
             return render_return_page(
@@ -265,8 +292,16 @@ class AdminCardConfirmView(APIView):
         tracking = request.data.get("tracking_number")
         if not tracking:
             return Response({"detail": "tracking_number الزامی است"}, status=400)
+        tx = PaymentService.get_transaction(str(tracking).strip())
+        if not tx:
+            return Response({"detail": "تراکنش یافت نشد"}, status=404)
+        if tx.gateway != "card":
+            return Response(
+                {"detail": "تأیید دستی فقط برای تراکنش کارت‌به‌کارت مجاز است"},
+                status=400,
+            )
         data, err = PaymentService.confirm_payment_by_tracking(
-            tracking, force_admin=True
+            tx.tracking_number, force_admin=True
         )
         if err:
             return Response({"detail": err}, status=400)

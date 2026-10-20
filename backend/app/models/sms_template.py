@@ -12,7 +12,11 @@ class SmsTemplate(TimeStampedModel):
         LOGIN_OTP = "login_otp", "کد ورود"
         SIGNUP_OTP = "signup_otp", "کد تأیید ثبت‌نام"
         FORGOT_PASSWORD = "forgot_password", "بازیابی رمز"
+        ORDER_CREATED = "order_created", "ثبت سفارش"
         ORDER_STATUS_CHANGED = "order_status_changed", "تغییر وضعیت سفارش"
+        ORDER_PAID = "order_paid", "پرداخت موفق"
+        ORDER_SHIPPED = "order_shipped", "ارسال سفارش"
+        ORDER_DELIVERED = "order_delivered", "تحویل سفارش"
         CUSTOM = "custom", "سفارشی"
 
     class Target(models.TextChoices):
@@ -50,6 +54,8 @@ class SmsTemplate(TimeStampedModel):
     )
     # Ordered list of parameter names for Signal pattern, e.g. ["otp", "name"]
     param_keys = models.JSONField(default=list, blank=True)
+    # Map param name -> allowlisted source key (see sms_params.ALLOWED_PARAM_SOURCES)
+    param_bindings = models.JSONField(default=dict, blank=True)
     # Default/sample values for test sends, e.g. {"otp": "1234"}
     sample_params = models.JSONField(default=dict, blank=True)
     notes = models.CharField(max_length=255, blank=True)

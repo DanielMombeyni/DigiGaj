@@ -1,4 +1,4 @@
-from django.db.models import Sum, Count, Q, Min, Max, Prefetch, Case, When, Value, IntegerField
+from django.db.models import Sum, Count, Q, Min, Max, Prefetch
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes, parser_classes
@@ -7,6 +7,11 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
+
+from app.services.product_display_price import (
+    DISPLAY_PRICE_ANNOTATION,
+    annotate_display_price,
+)
 
 from app.models import (
     AccountingEntry,
@@ -118,21 +123,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend, SearchFilter, ProductOrderingFilter]
     filterset_class = ProductFilter
     search_fields = ["name", "brand", "short_description"]
+    # display_priority is NOT in ordering_fields — public clients cannot request it.
     ordering_fields = ["price_toman", "created_at", "name"]
-    ordering = ["-created_at"]
-
-    def filter_queryset(self, queryset):
-        """Apply default DRF filters, then force unpriced products last for price sorts."""
-        qs = super().filter_queryset(queryset)
-        ordering = (self.request.query_params.get("ordering") or "").strip()
-        if ordering not in ("price_toman", "-price_toman"):
-            return qs
-        noprice = Case(
-            When(Q(price_on_request=True) | Q(price_toman__lte=0), then=Value(1)),
-            default=Value(0),
-            output_field=IntegerField(),
-        )
-        return qs.order_by(noprice, ordering, "id")
+    ordering = ["-display_priority", "-created_at"]
 
     def get_queryset(self):
         qs = Product.objects.select_related("category")
@@ -157,6 +150,8 @@ class ProductViewSet(viewsets.ModelViewSet):
                 "colors",
                 "sizes",
             )
+            # Align list filter/sort/serialization with card display price
+            qs = annotate_display_price(qs)
         else:
             qs = qs.prefetch_related(
                 "images",
@@ -166,6 +161,7 @@ class ProductViewSet(viewsets.ModelViewSet):
                 "variants__size",
                 "attributes",
             )
+            qs = annotate_display_price(qs)
         if not self.request.user.is_staff:
             qs = qs.filter(is_active=True)
         return qs
@@ -347,6 +343,11 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         if next_status not in valid:
             return Response({"detail": "وضعیت نامعتبر است"}, status=400)
         previous = order.status
+        from app.services.order_payment_access import manual_status_change_error
+
+        paid_err = manual_status_change_error(previous, next_status)
+        if paid_err:
+            return Response({"detail": paid_err}, status=400)
         if previous != next_status:
             order.status = next_status
             order.save(update_fields=["status", "updated_at"])
@@ -565,7 +566,7 @@ def admin_store_config(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def product_price_stats(request):
-    """Cheap min/max for filter UI — avoids two full product list requests."""
+    """Cheap min/max for filter UI — uses display_price (card min_price semantics)."""
     qs = Product.objects.filter(is_active=True)
     category = (request.query_params.get("category") or "").strip()
     if category:
@@ -573,8 +574,10 @@ def product_price_stats(request):
             qs = qs.filter(category_id=int(category))
         else:
             qs = qs.filter(category__slug=category)
-    agg = qs.filter(price_on_request=False).aggregate(
-        min_price=Min("price_toman"), max_price=Max("price_toman")
+    qs = annotate_display_price(qs.filter(price_on_request=False))
+    agg = qs.aggregate(
+        min_price=Min(DISPLAY_PRICE_ANNOTATION),
+        max_price=Max(DISPLAY_PRICE_ANNOTATION),
     )
     return Response(
         {
@@ -616,7 +619,9 @@ def storefront_home(request):
             ),
             "colors",
             "sizes",
-        )[:8]
+        )
+        # Keep homepage featured newest-first; do not inherit catalog display_priority Meta.
+        .order_by("-created_at", "id")[:8]
     )
     categories = (
         Category.objects.filter(is_active=True, parent__isnull=True)

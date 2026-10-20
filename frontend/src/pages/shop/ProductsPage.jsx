@@ -1,19 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { SlidersHorizontal } from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { ProductCard } from '@/components/shop/ProductCard'
 import FilterSelect from '@/components/shop/FilterSelect'
-import PriceRangeSlider from '@/components/shop/PriceRangeSlider'
-import StarRatingFilter from '@/components/shop/StarRatingFilter'
+import FilterActiveChips from '@/components/shop/FilterActiveChips'
+import ProductsFilterPanel from '@/components/shop/ProductsFilterPanel'
 import Seo from '@/components/common/Seo'
 import { brand } from '@/config/brand'
 import Reveal from '@/components/common/Reveal'
 import { useDebounce } from '@/hooks/useDebounce'
-import { categorySelectOptions } from '@/utils/categories'
 import { faDigits } from '@/utils/format'
+import { buildProductListParams, parseFeaturedParam } from '@/utils/productListQuery'
 
 const SORT_OPTIONS = [
+  { value: '', label: 'پیشنهادی فروشگاه' },
   { value: '-created_at', label: 'جدیدترین' },
   { value: 'price_toman', label: 'ارزان‌ترین' },
   { value: '-price_toman', label: 'گران‌ترین' },
@@ -26,16 +27,8 @@ function roundUp(n, step = PRICE_STEP) {
   return Math.ceil(n / step) * step
 }
 
-function buildParams({ search, category, minPrice, maxPrice, minRating, ordering, page }) {
-  const next = new URLSearchParams()
-  if (search) next.set('search', search)
-  if (category) next.set('category', category)
-  if (minPrice) next.set('min_price', minPrice)
-  if (maxPrice) next.set('max_price', maxPrice)
-  if (minRating) next.set('min_rating', minRating)
-  if (ordering && ordering !== '-created_at') next.set('ordering', ordering)
-  if (page && Number(page) > 1) next.set('page', String(page))
-  return next
+function buildParams(args) {
+  return buildProductListParams(args)
 }
 
 function parsePriceParam(value, fallback) {
@@ -43,24 +36,22 @@ function parsePriceParam(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
-function filtersDefaultOpen() {
-  return false
-}
-
 export default function ProductsPage() {
   const [params, setParams] = useSearchParams()
-  const [data, setData] = useState({ results: [] })
+  const [data, setData] = useState({ results: [], count: 0 })
+  const [listError, setListError] = useState('')
   const [categories, setCategories] = useState([])
   const [priceBounds, setPriceBounds] = useState({ floor: 0, ceil: DEFAULT_CEIL })
   const [q, setQ] = useState(() => params.get('search') || '')
   const [category, setCategory] = useState(() => params.get('category') || '')
   const [priceRange, setPriceRange] = useState([0, DEFAULT_CEIL])
-  const [ordering, setOrdering] = useState(() => params.get('ordering') || '-created_at')
-  const [minRating, setMinRating] = useState(() => params.get('min_rating') || '')
-  const [filtersOpen, setFiltersOpen] = useState(filtersDefaultOpen)
+  const [ordering, setOrdering] = useState(() => params.get('ordering') || '')
+  const [featured, setFeatured] = useState(() => parseFeaturedParam(params.get('is_featured')))
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [boundsReady, setBoundsReady] = useState(false)
   const [page, setPage] = useState(() => Math.max(1, Number(params.get('page') || 1) || 1))
+  const fetchGen = useRef(0)
 
   const debouncedQ = useDebounce(q, 300)
   const debouncedRange = useDebounce(priceRange, 400)
@@ -109,28 +100,33 @@ export default function ProductsPage() {
   }, [])
 
   useEffect(() => {
+    if (!categories.length || !category) return
+    const ok = categories.some((c) => String(c.id) === String(category))
+    if (!ok) setCategory('')
+  }, [categories, category])
+
+  useEffect(() => {
     const fromUrl = buildParams({
       search: params.get('search') || '',
       category: params.get('category') || '',
       minPrice: params.get('min_price') || '',
       maxPrice: params.get('max_price') || '',
-      minRating: params.get('min_rating') || '',
-      ordering: params.get('ordering') || '-created_at',
+      ordering: params.get('ordering') || '',
       page: params.get('page') || '1',
+      featured: parseFeaturedParam(params.get('is_featured')),
     }).toString()
     const fromState = buildParams({
       search: debouncedQ,
       category,
       minPrice: apiMin,
       maxPrice: apiMax,
-      minRating,
       ordering,
       page,
+      featured,
     }).toString()
     if (fromUrl === fromState) return
     setQ(params.get('search') || '')
     setCategory(params.get('category') || '')
-    setMinRating(params.get('min_rating') || '')
     setPage(Math.max(1, Number(params.get('page') || 1) || 1))
     if (boundsReady) {
       setPriceRange([
@@ -138,7 +134,8 @@ export default function ProductsPage() {
         parsePriceParam(params.get('max_price'), priceBounds.ceil),
       ])
     }
-    setOrdering(params.get('ordering') || '-created_at')
+    setOrdering(params.get('ordering') || '')
+    setFeatured(parseFeaturedParam(params.get('is_featured')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramKey, boundsReady])
 
@@ -148,17 +145,16 @@ export default function ProductsPage() {
       category,
       minPrice: apiMin,
       maxPrice: apiMax,
-      minRating,
       ordering,
       page,
+      featured,
     })
     if (next.toString() !== params.toString()) {
       setParams(next, { replace: true })
     }
-  }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, page, params, setParams])
+  }, [debouncedQ, category, apiMin, apiMax, ordering, page, featured, params, setParams])
 
-  // Reset to page 1 when filters change (keep page when only page itself changes)
-  const filterKey = `${debouncedQ}|${category}|${apiMin}|${apiMax}|${minRating}|${ordering}`
+  const filterKey = `${debouncedQ}|${category}|${apiMin}|${apiMax}|${ordering}|${featured ? '1' : '0'}`
   const prevFilterKey = useRef(filterKey)
   useEffect(() => {
     if (prevFilterKey.current === filterKey) return
@@ -167,29 +163,37 @@ export default function ProductsPage() {
   }, [filterKey])
 
   useEffect(() => {
+    const gen = ++fetchGen.current
     let cancelled = false
     setLoading(true)
+    setListError('')
     shopApi
       .products({
         search: debouncedQ || undefined,
         category: category || undefined,
         min_price: apiMin || undefined,
         max_price: apiMax || undefined,
-        min_rating: minRating || undefined,
         ordering: ordering || undefined,
+        is_featured: featured ? true : undefined,
         page,
         page_size: 24,
       })
       .then((r) => {
-        if (!cancelled) setData(r.data)
+        if (cancelled || gen !== fetchGen.current) return
+        setData(r.data?.results ? r.data : { results: [], count: 0 })
+      })
+      .catch(() => {
+        if (cancelled || gen !== fetchGen.current) return
+        setData({ results: [], count: 0 })
+        setListError('بارگذاری محصولات ناموفق بود. لطفاً دوباره تلاش کنید.')
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && gen === fetchGen.current) setLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [debouncedQ, category, apiMin, apiMax, minRating, ordering, page])
+  }, [debouncedQ, category, apiMin, apiMax, ordering, featured, page])
 
   const list = data.results || data
   const items = Array.isArray(list) ? list : []
@@ -201,50 +205,79 @@ export default function ProductsPage() {
     boundsReady &&
     (debouncedRange[0] > priceBounds.floor || debouncedRange[1] < priceBounds.ceil)
 
+  const searchActive = Boolean(debouncedQ.trim())
+
   const clearFilters = () => {
     setQ('')
     setCategory('')
-    setMinRating('')
     setPriceRange([priceBounds.floor, priceBounds.ceil])
-    setOrdering('-created_at')
+    setOrdering('')
+    setFeatured(false)
     setPage(1)
+    setListError('')
   }
 
-  const panelFiltersActive = useMemo(
-    () =>
-      Boolean(
-        category ||
-          priceFiltered ||
-          minRating ||
-          (ordering && ordering !== '-created_at'),
-      ),
-    [category, priceFiltered, minRating, ordering],
+  /** Any filter/sort/search that should show clear-all (includes search-only). */
+  const hasClearableState = useMemo(
+    () => Boolean(searchActive || category || priceFiltered || ordering || featured),
+    [searchActive, category, priceFiltered, ordering, featured],
   )
 
-  const activeFilterLabels = useMemo(() => {
-    const labels = []
+  const panelFiltersActive = useMemo(
+    () => Boolean(category || priceFiltered || featured),
+    [category, priceFiltered, featured],
+  )
+
+  const activeChips = useMemo(() => {
+    const chips = []
+    if (searchActive) {
+      chips.push({ key: 'search', label: `جستجو: ${debouncedQ.trim()}` })
+    }
     if (category) {
       const cat = categories.find((c) => String(c.id) === category)
-      labels.push(cat?.name || 'دسته‌بندی')
+      chips.push({ key: 'category', label: cat?.name || 'دسته‌بندی' })
     }
-    if (minRating) labels.push(`${minRating} ستاره به بالا`)
     if (priceFiltered) {
-      labels.push(`قیمت ${debouncedRange[0].toLocaleString('fa-IR')}–${debouncedRange[1].toLocaleString('fa-IR')}`)
+      chips.push({
+        key: 'price',
+        label: `قیمت ${debouncedRange[0].toLocaleString('fa-IR')}–${debouncedRange[1].toLocaleString('fa-IR')}`,
+      })
     }
-    const sortLabel = SORT_OPTIONS.find((o) => o.value === ordering)?.label
-    if (ordering && ordering !== '-created_at' && sortLabel) labels.push(sortLabel)
-    return labels
-  }, [category, categories, minRating, priceFiltered, debouncedRange, ordering])
+    if (featured) {
+      chips.push({ key: 'featured', label: 'محصولات ویژه' })
+    }
+    if (ordering) {
+      const sortLabel = SORT_OPTIONS.find((o) => o.value === ordering)?.label
+      if (sortLabel) chips.push({ key: 'ordering', label: sortLabel })
+    }
+    return chips
+  }, [searchActive, debouncedQ, category, categories, priceFiltered, debouncedRange, featured, ordering])
+
+  const removeChip = (key) => {
+    if (key === 'search') setQ('')
+    else if (key === 'category') setCategory('')
+    else if (key === 'price') setPriceRange([priceBounds.floor, priceBounds.ceil])
+    else if (key === 'featured') setFeatured(false)
+    else if (key === 'ordering') setOrdering('')
+  }
 
   const seoQuery = buildParams({
     search: debouncedQ,
     category,
     minPrice: apiMin,
     maxPrice: apiMax,
-    minRating,
     ordering,
     page,
+    featured,
   }).toString()
+
+  const countLabel = loading
+    ? 'در حال بارگذاری…'
+    : listError
+      ? null
+      : totalCount === 0
+        ? 'محصولی یافت نشد'
+        : `${faDigits(totalCount)} محصول`
 
   return (
     <div className="mx-auto min-w-0 max-w-6xl px-4 py-10 md:py-14">
@@ -270,102 +303,89 @@ export default function ProductsPage() {
         </label>
       </Reveal>
 
-      <Reveal className="mt-8 min-w-0 overflow-hidden rounded-2xl border border-mist-200/80 bg-white/80 shadow-soft">
-        <div className="flex items-center gap-3 border-b border-mist-100 p-4">
+      <Reveal className="mt-8 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <button
             type="button"
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-start"
-            onClick={() => setFiltersOpen((open) => !open)}
+            className="btn-secondary inline-flex min-h-11 cursor-pointer items-center gap-2 px-4"
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
             aria-expanded={filtersOpen}
-            aria-controls="products-filters-panel"
           >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-mist-100 text-ink-700/70">
-              <SlidersHorizontal className="h-4 w-4" strokeWidth={1.75} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-ink-950">فیلترها</span>
-              {!filtersOpen && activeFilterLabels.length > 0 && (
-                <span className="mt-0.5 block truncate text-xs text-ink-700/55">
-                  {activeFilterLabels.join(' · ')}
-                </span>
-              )}
-              {!filtersOpen && !activeFilterLabels.length && (
-                <span className="mt-0.5 block text-xs text-ink-700/45">دسته‌بندی، امتیاز، قیمت و مرتب‌سازی</span>
-              )}
-            </span>
-            <ChevronDown
-              className={`h-5 w-5 shrink-0 text-ink-700/45 transition-transform duration-300 ${
-                filtersOpen ? 'rotate-180' : ''
-              }`}
-              strokeWidth={1.75}
-            />
+            <SlidersHorizontal className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+            فیلترها
+            {panelFiltersActive && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-copper-500 px-1.5 text-[10px] font-bold text-white">
+                {faDigits(
+                  [category, priceFiltered, featured].filter(Boolean).length,
+                )}
+              </span>
+            )}
           </button>
-          {panelFiltersActive && (
+          {hasClearableState && (
             <button
               type="button"
-              className="shrink-0 cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-sea-600 transition hover:bg-sea-50 hover:text-copper-600"
+              className="cursor-pointer rounded-xl px-3 py-2 text-xs font-medium text-sea-600 transition hover:bg-sea-50 hover:text-copper-600"
               onClick={clearFilters}
             >
-              پاک کردن
+              پاک کردن فیلترها
             </button>
           )}
         </div>
-
-        <div
-          id="products-filters-panel"
-          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-            filtersOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-          }`}
-        >
-          <div className="min-h-0 overflow-hidden">
-            <div className="p-4 pt-3">
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <FilterSelect
-                  label="دسته‌بندی"
-                  id="filter-category"
-                  value={category}
-                  onChange={setCategory}
-                  options={categorySelectOptions(categories, { includeRootLabel: true })}
-                />
-
-                <FilterSelect
-                  label="مرتب‌سازی"
-                  id="filter-sort"
-                  value={ordering}
-                  onChange={setOrdering}
-                  options={SORT_OPTIONS}
-                />
-              </div>
-
-              <div className="mt-4 min-w-0 border-t border-mist-100 pt-4">
-                <StarRatingFilter value={minRating} onChange={setMinRating} />
-              </div>
-
-              <div className="mt-4 min-w-0 border-t border-mist-100 pt-4">
-                <span className="label">بازه قیمت (تومان)</span>
-                {boundsReady ? (
-                  <PriceRangeSlider
-                    min={priceBounds.floor}
-                    max={priceBounds.ceil}
-                    valueMin={priceRange[0]}
-                    valueMax={priceRange[1]}
-                    step={PRICE_STEP}
-                    onChange={setPriceRange}
-                  />
-                ) : (
-                  <div className="mt-2 h-9 animate-pulse rounded-xl bg-mist-100" />
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="w-full min-w-0 sm:max-w-[14rem]">
+          <FilterSelect
+            label="مرتب‌سازی"
+            id="filter-sort"
+            value={ordering}
+            onChange={setOrdering}
+            options={SORT_OPTIONS}
+          />
         </div>
       </Reveal>
 
-      <div className="mt-10 min-w-0">
+      <div className="mt-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {countLabel && (
+          <p className="text-sm font-medium tabular-nums text-ink-700/70" aria-live="polite">
+            {countLabel}
+          </p>
+        )}
+        <FilterActiveChips
+          chips={activeChips}
+          onRemove={removeChip}
+          onClearAll={hasClearableState ? clearFilters : undefined}
+          className="sm:justify-end"
+        />
+      </div>
+
+      <ProductsFilterPanel
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        categories={categories}
+        category={category}
+        onCategoryChange={setCategory}
+        priceBounds={priceBounds}
+        priceRange={priceRange}
+        onPriceChange={setPriceRange}
+        boundsReady={boundsReady}
+        featured={featured}
+        onFeaturedChange={setFeatured}
+        onClearAll={clearFilters}
+        hasActiveFilters={panelFiltersActive || searchActive}
+      />
+
+      <div className="mt-8 min-w-0">
+        {listError && (
+          <p className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600" role="alert">
+            {listError}
+          </p>
+        )}
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-mist-100 sm:h-72 sm:aspect-auto" />
+              <div
+                key={i}
+                className="aspect-[3/4] animate-pulse rounded-2xl bg-mist-100 sm:h-72 sm:aspect-auto"
+              />
             ))}
           </div>
         ) : items.length ? (
@@ -401,7 +421,7 @@ export default function ProductsPage() {
           </>
         ) : (
           <p className="rounded-2xl border border-dashed border-mist-200 bg-white px-6 py-16 text-center text-sm text-ink-700/50">
-            محصولی با این فیلتر پیدا نشد.
+            {listError ? 'نتیجه‌ای نمایش داده نمی‌شود.' : 'محصولی با این فیلتر پیدا نشد.'}
           </p>
         )}
       </div>

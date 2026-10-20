@@ -3,6 +3,10 @@ DEBUG = False
 import os
 
 from app.utils.deploy_env import build_deploy_config, is_placeholder_public_url
+from app.utils.security import validate_production_secret_key
+
+# SECRET_KEY is loaded in components/base.py before this environment module.
+validate_production_secret_key(globals().get("SECRET_KEY", ""))
 
 _auto = os.environ.get("AUTO_DEPLOY_CONFIG", "1").strip().lower() not in ("0", "false", "no", "off")
 _deploy = build_deploy_config() if _auto else None

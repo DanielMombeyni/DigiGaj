@@ -1,5 +1,5 @@
-/** Build indented category options for selects (parent → children). */
-export function categorySelectOptions(items, { includeRootLabel = false } = {}) {
+/** Group categories by parent id (`root` for top-level). Sorted for Persian UI. */
+export function categoryChildrenMap(items) {
   const list = Array.isArray(items) ? items : []
   const byParent = new Map()
   for (const c of list) {
@@ -10,6 +10,13 @@ export function categorySelectOptions(items, { includeRootLabel = false } = {}) 
   for (const group of byParent.values()) {
     group.sort((a, b) => (a.sort_order - b.sort_order) || String(a.name).localeCompare(b.name, 'fa'))
   }
+  return byParent
+}
+
+/** Build indented category options for selects (parent → children). */
+export function categorySelectOptions(items, { includeRootLabel = false } = {}) {
+  const list = Array.isArray(items) ? items : []
+  const byParent = categoryChildrenMap(list)
   const out = []
   const walk = (parentKey, depth) => {
     for (const c of byParent.get(parentKey) || []) {

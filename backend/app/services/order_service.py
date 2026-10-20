@@ -134,8 +134,15 @@ class OrderService:
                 used_count=discount_obj.used_count + 1
             )
         from app.services.email_dispatch import queue_mail_event
+        from app.services.sms_dispatch import queue_order_created_sms
 
         queue_mail_event("order_created", "order", order.pk)
+        try:
+            queue_order_created_sms(order)
+        except Exception:
+            import logging
+
+            logging.getLogger("app.sms").exception("order created sms schedule failed")
         return order, None
 
     @classmethod

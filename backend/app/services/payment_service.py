@@ -16,6 +16,7 @@ from app.models import (
 from app.payment.facade import PaymentFacade
 from app.payment.registry import get_driver
 from app.payment.utils import callback_url_for, detect_platform
+from app.services.staff_access import user_has_admin_page
 
 logger = logging.getLogger("app.payment")
 
@@ -23,6 +24,20 @@ logger = logging.getLogger("app.payment")
 def _tracking() -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "TX" + "".join(secrets.choice(alphabet) for _ in range(14))
+
+
+def user_can_access_transaction(user, tx: PurchaseTransaction) -> bool:
+    """Owner of the TX/order, or staff with the transactions admin page."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    if user_has_admin_page(user, "transactions"):
+        return True
+    if tx.user_id and tx.user_id == user.id:
+        return True
+    order = tx.order
+    if order is not None and order.user_id and order.user_id == user.id:
+        return True
+    return False
 
 
 class PaymentService:
@@ -37,11 +52,14 @@ class PaymentService:
         product: Product | None = None,
         quantity: int = 1,
         platform: str | None = None,
-        amount_toman: int | None = None,
         description: str = "",
         mobile: str = "",
         meta: dict | None = None,
     ) -> tuple[dict | None, str | None]:
+        """
+        Start a payment. Amount is always taken from the order total or product price
+        on the server — never from a client-supplied amount_toman.
+        """
         platform = platform or detect_platform(request)
         user = request.user if request.user.is_authenticated else None
 
@@ -57,16 +75,11 @@ class PaymentService:
             order_id = order.order_number
             description = description or f"پرداخت سفارش {order.order_number}"
         elif product is not None:
-            if product.price_on_request:
-                return None, f"محصول «{product.name}» قیمت ندارد"
-            amount = product.price_toman * max(1, quantity)
-            order_id = f"PRD-{product.id}"
-            description = description or f"خرید {product.name}"
-        elif amount_toman is not None:
-            amount = int(amount_toman)
-            order_id = f"MANUAL-{timezone.now().strftime('%Y%m%d%H%M%S')}"
+            # Direct product purchase bypasses order/checkout inventory reservation.
+            # Supported clients use checkout; reject until a safe reservation path exists.
+            return None, "خرید مستقیم محصول پشتیبانی نمی‌شود؛ از مسیر ثبت سفارش استفاده کنید"
         else:
-            return None, "سفارش یا محصول الزامی است"
+            return None, "سفارش الزامی است"
 
         if amount <= 0:
             return None, "مبلغ نامعتبر است"
@@ -155,6 +168,11 @@ class PaymentService:
         if not driver:
             return None, "درایور یافت نشد"
 
+        # Manual admin confirm is exclusively for card-to-card transactions.
+        if force_admin:
+            if driver.flow != "card" or tx.gateway != "card":
+                return None, "تأیید دستی فقط برای تراکنش کارت‌به‌کارت مجاز است"
+
         # Card: only admin can confirm
         if driver.flow == "card" and not force_admin:
             return (
@@ -241,6 +259,14 @@ class PaymentService:
                 order.pk,
                 {"previous_status": Order.Status.PENDING},
             )
+            try:
+                from app.services.sms_dispatch import queue_order_paid_sms
+
+                queue_order_paid_sms(order)
+            except Exception:
+                import logging
+
+                logging.getLogger("app.sms").exception("order paid sms schedule failed")
             # decrease stock
             for item in order.items.select_related("product"):
                 product = item.product
@@ -273,11 +299,16 @@ class PaymentService:
         tx.save(update_fields=["activated_at", "updated_at"])
 
     @staticmethod
-    def get_status(tracking_number: str) -> dict | None:
+    def get_transaction(tracking_number: str) -> PurchaseTransaction | None:
         try:
-            tx = PurchaseTransaction.objects.get(tracking_number=tracking_number)
+            return PurchaseTransaction.objects.select_related("order").get(
+                tracking_number=tracking_number
+            )
         except PurchaseTransaction.DoesNotExist:
             return None
+
+    @staticmethod
+    def serialize_status(tx: PurchaseTransaction) -> dict:
         return {
             "tracking_number": tx.tracking_number,
             "status": tx.status,
@@ -288,3 +319,10 @@ class PaymentService:
             "extra": (tx.metadata or {}).get("extra") or {},
             "created_at": tx.created_at,
         }
+
+    @classmethod
+    def get_status(cls, tracking_number: str) -> dict | None:
+        tx = cls.get_transaction(tracking_number)
+        if not tx:
+            return None
+        return cls.serialize_status(tx)

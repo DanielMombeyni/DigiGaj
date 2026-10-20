@@ -22,10 +22,16 @@ function emptyForm(mode = 'text') {
     body_text: '',
     pattern_id: '',
     param_keys: '',
+    param_bindings: {},
     sample_params: {},
     notes: '',
     is_enabled: true,
   }
+}
+
+function newClientRequestId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return `sms-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
 function renderPreview(body, context) {
@@ -173,7 +179,7 @@ export default function AdminSmsPage() {
   const [logs, setLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
 
-  const [sendMode, setSendMode] = useState('text')
+  const [sendMode, setSendMode] = useState('template') // template | text | pattern
   const [sendPhones, setSendPhones] = useState('')
   const [sendMessage, setSendMessage] = useState('')
   const [sendPatternId, setSendPatternId] = useState('')
@@ -182,6 +188,11 @@ export default function AdminSmsPage() {
   const [sendTemplateId, setSendTemplateId] = useState('')
   const [sendBusy, setSendBusy] = useState(false)
   const [lastResult, setLastResult] = useState(null)
+  const [recipientQuery, setRecipientQuery] = useState('')
+  const [recipientHits, setRecipientHits] = useState([])
+  const [selectedUsers, setSelectedUsers] = useState([])
+  const [manualParams, setManualParams] = useState({})
+  const [recipientSearchBusy, setRecipientSearchBusy] = useState(false)
 
   const [testRow, setTestRow] = useState(null)
   const [testPhone, setTestPhone] = useState('')
@@ -215,6 +226,27 @@ export default function AdminSmsPage() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (sendMode !== 'template') return undefined
+    const q = recipientQuery.trim()
+    if (q.length < 2) {
+      setRecipientHits([])
+      return undefined
+    }
+    const t = setTimeout(async () => {
+      setRecipientSearchBusy(true)
+      try {
+        const { data } = await adminApi.sms.recipients({ search: q })
+        setRecipientHits(data.results || [])
+      } catch {
+        setRecipientHits([])
+      } finally {
+        setRecipientSearchBusy(false)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [recipientQuery, sendMode])
+
   const loadLogs = async () => {
     setLogsLoading(true)
     try {
@@ -237,8 +269,16 @@ export default function AdminSmsPage() {
   )
   const rows = filter ? items.filter((row) => row.mode === filter) : items
   const balanceLabel = formatBalance(catalog.balance)
+  const maxRecipients = catalog.manual_send_max_recipients || 100
   const phoneCount = parsePhones(sendPhones).length
+  const selectedCount = selectedUsers.length
   const segments = sendMode === 'text' ? smsSegments(sendMessage) : 0
+  const selectedTemplate = useMemo(
+    () => items.find((t) => String(t.id) === String(sendTemplateId)) || null,
+    [items, sendTemplateId],
+  )
+  const manualKeys = selectedTemplate?.manual_param_keys || []
+  const paramSources = catalog.param_sources || []
 
   const modeOptions = useMemo(() => {
     if (catalog.modes?.length) return catalog.modes
@@ -252,8 +292,13 @@ export default function AdminSmsPage() {
     if (catalog.events?.length) return catalog.events
     return [
       { key: 'login_otp', label: 'کد ورود' },
+      { key: 'signup_otp', label: 'کد تأیید ثبت‌نام' },
       { key: 'forgot_password', label: 'بازیابی رمز' },
+      { key: 'order_created', label: 'ثبت سفارش' },
       { key: 'order_status_changed', label: 'تغییر وضعیت سفارش' },
+      { key: 'order_paid', label: 'پرداخت موفق' },
+      { key: 'order_shipped', label: 'ارسال سفارش' },
+      { key: 'order_delivered', label: 'تحویل سفارش' },
       { key: 'custom', label: 'سفارشی' },
     ]
   }, [catalog.events])
@@ -289,20 +334,28 @@ export default function AdminSmsPage() {
   const applyTemplate = (id) => {
     setSendTemplateId(id)
     const row = items.find((t) => String(t.id) === String(id))
-    if (!row) return
-    setSendMode(row.mode === 'pattern' ? 'pattern' : 'text')
-    if (row.mode === 'pattern') {
-      setSendPatternId(row.pattern_id != null ? String(row.pattern_id) : '')
-      const keys = parseParamKeys(row.param_keys)
-      setSendParamKeys(keys)
-      setSendParams({ ...(row.sample_params || {}) })
-      setSendMessage('')
-    } else {
-      setSendMessage(row.body_text || '')
-      setSendPatternId('')
-      setSendParamKeys([])
-      setSendParams({})
+    if (!row) {
+      setManualParams({})
+      return
     }
+    const keys = row.manual_param_keys || []
+    const next = {}
+    keys.forEach((k) => {
+      next[k] = ''
+    })
+    setManualParams(next)
+  }
+
+  const toggleUser = (user) => {
+    setSelectedUsers((prev) => {
+      const exists = prev.some((u) => u.id === user.id)
+      if (exists) return prev.filter((u) => u.id !== user.id)
+      if (prev.length >= maxRecipients) {
+        setError(`حداکثر ${maxRecipients} گیرنده مجاز است.`)
+        return prev
+      }
+      return [...prev, user]
+    })
   }
 
   const openCreate = () => {
@@ -323,6 +376,7 @@ export default function AdminSmsPage() {
       body_text: row.body_text || '',
       pattern_id: row.pattern_id != null ? String(row.pattern_id) : '',
       param_keys: Array.isArray(row.param_keys) ? row.param_keys.join(', ') : '',
+      param_bindings: { ...(row.param_bindings || {}) },
       sample_params: { ...(row.sample_params || {}) },
       notes: row.notes || '',
       is_enabled: row.is_enabled !== false,
@@ -346,14 +400,20 @@ export default function AdminSmsPage() {
       for (const key of keys) {
         sample_params[key] = form.sample_params?.[key] ?? ''
       }
+      const param_bindings = {}
+      keys.forEach((k) => {
+        const src = form.param_bindings?.[k]
+        if (src) param_bindings[k] = src
+      })
       const payload = {
         name: form.name.trim(),
         event: form.event,
         target_user: form.target_user,
         mode: form.mode,
-        body_text: form.body_text,
+        body_text: form.mode === 'text' ? form.body_text : '',
         pattern_id: form.mode === 'pattern' ? form.pattern_id : null,
         param_keys: keys,
+        param_bindings,
         sample_params,
         notes: form.notes.trim(),
         is_enabled: form.is_enabled,
@@ -399,8 +459,55 @@ export default function AdminSmsPage() {
     }
   }
 
+  const onTemplateSend = async (e) => {
+    e.preventDefault()
+    if (!selectedTemplate) {
+      setError('یک قالب فعال انتخاب کنید.')
+      return
+    }
+    if (!selectedCount) {
+      setError('حداقل یک کاربر انتخاب کنید.')
+      return
+    }
+    if (selectedCount > maxRecipients) {
+      setError(`حداکثر ${maxRecipients} گیرنده مجاز است.`)
+      return
+    }
+    const okConfirm = await confirm({
+      title: 'تأیید ارسال پیامک',
+      description: `ارسال قالب «${selectedTemplate.name}» به ${faDigits(selectedCount)} کاربر؟`,
+      confirmLabel: 'ارسال',
+    })
+    if (!okConfirm) return
+    setSendBusy(true)
+    setError('')
+    setOk('')
+    setLastResult(null)
+    try {
+      const r = await adminApi.sms.sendTemplate({
+        template_id: selectedTemplate.id,
+        user_ids: selectedUsers.map((u) => u.id),
+        manual_params: manualParams,
+        confirm: true,
+        client_request_id: newClientRequestId(),
+      })
+      setOk(
+        `ارسال انجام شد — موفق: ${faDigits(r.data?.sent || 0)}، ناموفق: ${faDigits(r.data?.failed || 0)}`,
+      )
+      setLastResult(r.data)
+    } catch (err) {
+      setError(firstError(err.response?.data))
+    } finally {
+      setSendBusy(false)
+    }
+  }
+
   const onQuickSend = async (e) => {
     e.preventDefault()
+    if (phoneCount > maxRecipients) {
+      setError(`حداکثر ${maxRecipients} شماره مجاز است.`)
+      return
+    }
     setSendBusy(true)
     setError('')
     setOk('')
@@ -565,26 +672,57 @@ export default function AdminSmsPage() {
           <div className="mb-4">
             <h2 className="font-display text-base font-bold text-ink-900">ارسال پیامک</h2>
             <p className="mt-0.5 text-xs text-ink-700/50">
-              شماره‌ها را با فاصله یا ویرگول جدا کنید. می‌توانید از قالب ذخیره‌شده هم استفاده کنید.
+              ارسال از قالب ذخیره‌شده به کاربران انتخاب‌شده (حداکثر {faDigits(maxRecipients)} نفر)، یا ارسال سریع با شماره.
             </p>
           </div>
 
-          <form onSubmit={onQuickSend} className="space-y-4">
-            {enabledTemplates.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSendMode('template')}
+              className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                sendMode === 'template'
+                  ? 'bg-ink-950 text-white'
+                  : 'bg-mist-100 text-ink-700/70 hover:bg-mist-200'
+              }`}
+            >
+              قالب + کاربران
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendMode('text')}
+              className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                sendMode === 'text'
+                  ? 'bg-ink-950 text-white'
+                  : 'bg-mist-100 text-ink-700/70 hover:bg-mist-200'
+              }`}
+            >
+              متن آزاد (سریع)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendMode('pattern')}
+              className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                sendMode === 'pattern'
+                  ? 'bg-ink-950 text-white'
+                  : 'bg-mist-100 text-ink-700/70 hover:bg-mist-200'
+              }`}
+            >
+              الگوی خام (سریع)
+            </button>
+          </div>
+
+          {sendMode === 'template' ? (
+            <form onSubmit={onTemplateSend} className="space-y-4">
               <label className="block max-w-md">
-                <span className="label">بارگذاری از قالب</span>
+                <span className="label">قالب فعال</span>
                 <select
                   className="input"
                   value={sendTemplateId}
-                  onChange={(e) => {
-                    if (!e.target.value) {
-                      setSendTemplateId('')
-                      return
-                    }
-                    applyTemplate(e.target.value)
-                  }}
+                  onChange={(e) => applyTemplate(e.target.value)}
+                  required
                 >
-                  <option value="">بدون قالب — ورود دستی</option>
+                  <option value="">انتخاب قالب…</option>
                   {enabledTemplates.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name} ({t.mode_label})
@@ -592,42 +730,109 @@ export default function AdminSmsPage() {
                   ))}
                 </select>
               </label>
-            )}
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSendMode('text')
-                  setSendTemplateId('')
-                }}
-                className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  sendMode === 'text'
-                    ? 'bg-ink-950 text-white'
-                    : 'bg-mist-100 text-ink-700/70 hover:bg-mist-200'
-                }`}
-              >
-                متن آزاد
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSendMode('pattern')
-                  setSendTemplateId('')
-                }}
-                className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  sendMode === 'pattern'
-                    ? 'bg-ink-950 text-white'
-                    : 'bg-mist-100 text-ink-700/70 hover:bg-mist-200'
-                }`}
-              >
-                الگوی سیگنال
-              </button>
-            </div>
+              <label className="block">
+                <span className="label">جستجوی کاربر (نام، نام کاربری، شماره)</span>
+                <input
+                  className="input"
+                  value={recipientQuery}
+                  onChange={(e) => setRecipientQuery(e.target.value)}
+                  placeholder="حداقل ۲ نویسه…"
+                />
+              </label>
+              {recipientSearchBusy ? (
+                <p className="text-xs text-ink-700/45">در حال جستجو…</p>
+              ) : null}
+              {recipientHits.length > 0 && (
+                <ul className="max-h-40 overflow-auto rounded-xl border border-mist-200 divide-y divide-mist-100">
+                  {recipientHits.map((u) => {
+                    const checked = selectedUsers.some((s) => s.id === u.id)
+                    return (
+                      <li key={u.id}>
+                        <button
+                          type="button"
+                          onClick={() => toggleUser(u)}
+                          className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-right text-sm hover:bg-mist-50"
+                        >
+                          <span>
+                            {u.name || u.username}
+                            <span className="ms-2 font-mono text-xs text-ink-700/45" dir="ltr">
+                              {u.phone || '—'}
+                            </span>
+                          </span>
+                          <span className="text-xs text-copper-700">{checked ? 'حذف' : 'افزودن'}</span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
 
+              <div className="rounded-xl border border-mist-200 bg-mist-50 px-3 py-2 text-sm">
+                انتخاب‌شده: <strong className="tabular-nums">{faDigits(selectedCount)}</strong> /{' '}
+                {faDigits(maxRecipients)}
+                {selectedUsers.length > 0 && (
+                  <ul className="mt-2 max-h-28 space-y-1 overflow-auto text-xs text-ink-700/70">
+                    {selectedUsers.map((u) => (
+                      <li key={u.id} className="flex justify-between gap-2">
+                        <span>
+                          {u.name || u.username}{' '}
+                          <span className="font-mono" dir="ltr">
+                            {u.phone || 'بدون شماره'}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="cursor-pointer text-red-600"
+                          onClick={() => toggleUser(u)}
+                        >
+                          حذف
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {manualKeys.length > 0 && (
+                <div>
+                  <span className="label">پارامترهای دستی قالب</span>
+                  <ParamFields keys={manualKeys} values={manualParams} onChange={setManualParams} />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn-primary cursor-pointer"
+                disabled={sendBusy || !selectedTemplate || !selectedCount}
+              >
+                {sendBusy ? 'در حال ارسال…' : 'تأیید و ارسال'}
+              </button>
+
+              {lastResult?.results && (
+                <div className="rounded-xl border border-mist-200 bg-white px-3 py-2 text-xs">
+                  <div className="mb-1 font-medium">نتایج (batch: {lastResult.batch_id})</div>
+                  <ul className="max-h-40 space-y-1 overflow-auto">
+                    {lastResult.results.map((r) => (
+                      <li key={`${r.user_id}-${r.phone}`} className="flex justify-between gap-2">
+                        <span dir="ltr" className="font-mono">
+                          {r.phone || r.username}
+                        </span>
+                        <span className={r.status === 'sent' ? 'text-emerald-700' : 'text-red-600'}>
+                          {r.status === 'sent' ? 'موفق' : r.error || 'ناموفق'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </form>
+          ) : (
+          <form onSubmit={onQuickSend} className="space-y-4">
             <label className="block">
               <span className="label">
-                شماره گیرنده{phoneCount > 1 ? `ها (${faDigits(phoneCount)})` : ''}
+                شماره گیرنده{phoneCount > 1 ? `ها (${faDigits(phoneCount)})` : ''} — حداکثر{' '}
+                {faDigits(maxRecipients)}
               </span>
               <input
                 className="input"
@@ -715,6 +920,7 @@ export default function AdminSmsPage() {
               </button>
             </div>
           </form>
+          )}
         </section>
       ) : panel === 'templates' ? (
         <section className="space-y-4">
@@ -825,7 +1031,10 @@ export default function AdminSmsPage() {
               هنوز گزارشی ثبت نشده است.
             </div>
           ) : (
-            <AdminTable columns={['زمان', 'شماره', 'رویداد', 'وضعیت', 'خطا']} emptyMessage="گزارشی نیست">
+            <AdminTable
+              columns={['زمان', 'شماره', 'رویداد', 'قالب', 'ادمین', 'وضعیت', 'خطا']}
+              emptyMessage="گزارشی نیست"
+            >
               {logs.map((row) => (
                 <tr key={row.id} className="border-t border-mist-100">
                   <td className="px-4 py-3 text-xs text-ink-700/60" dir="ltr">
@@ -834,7 +1043,21 @@ export default function AdminSmsPage() {
                   <td className="px-4 py-3 text-sm" dir="ltr">
                     {row.phone}
                   </td>
-                  <td className="px-4 py-3 text-sm">{row.event}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {row.event}
+                    {row.fallback_reason ? (
+                      <span className="mt-0.5 block text-[10px] text-amber-700">
+                        fallback: {row.fallback_reason}
+                      </span>
+                    ) : null}
+                    {row.batch_id ? (
+                      <span className="mt-0.5 block font-mono text-[10px] text-ink-700/40">
+                        {row.batch_id.slice(0, 12)}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-xs">{row.template_name || '—'}</td>
+                  <td className="px-4 py-3 text-xs">{row.actor_username || '—'}</td>
                   <td className="px-4 py-3 text-sm">{row.status_label || row.status}</td>
                   <td className="px-4 py-3 text-xs text-red-700">{row.error || '—'}</td>
                 </tr>
@@ -976,17 +1199,47 @@ export default function AdminSmsPage() {
                   dir="ltr"
                 />
                 <span className="mt-1 block text-xs text-ink-700/45">
-                  مقدار کد ورود/بازیابی روی همین نام‌ها پر می‌شود (مثلاً otp یا code).
+                  متن پیام در پنل سیگنال است؛ اینجا فقط شناسه و نگاشت پارامتر ذخیره می‌شود.
                 </span>
               </label>
               {formParamKeys.length > 0 && (
-                <div>
-                  <span className="label">مقادیر نمونه برای تست</span>
-                  <ParamFields
-                    keys={formParamKeys}
-                    values={form.sample_params}
-                    onChange={(sample_params) => setForm({ ...form, sample_params })}
-                  />
+                <div className="space-y-2">
+                  <span className="label">منبع داده هر پارامتر (allowlist)</span>
+                  {formParamKeys.map((key) => (
+                    <label key={key} className="grid grid-cols-[1fr_1.4fr] items-center gap-2">
+                      <span className="font-mono text-xs" dir="ltr">
+                        {key}
+                      </span>
+                      <select
+                        className="input"
+                        value={form.param_bindings?.[key] || ''}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            param_bindings: {
+                              ...(form.param_bindings || {}),
+                              [key]: e.target.value,
+                            },
+                          })
+                        }
+                      >
+                        <option value="">پیش‌فرض هوشمند</option>
+                        {paramSources.map((src) => (
+                          <option key={src.key} value={src.key}>
+                            {src.key} — {src.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                  <div>
+                    <span className="label">مقادیر نمونه برای تست (بدون OTP واقعی)</span>
+                    <ParamFields
+                      keys={formParamKeys}
+                      values={form.sample_params}
+                      onChange={(sample_params) => setForm({ ...form, sample_params })}
+                    />
+                  </div>
                 </div>
               )}
             </>

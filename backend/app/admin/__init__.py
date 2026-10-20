@@ -70,11 +70,13 @@ class ProductAdmin(admin.ModelAdmin):
         "category",
         "price_toman",
         "stock",
+        "display_priority",
         "is_active",
         "is_featured",
     )
     list_filter = ("is_active", "is_featured", "condition", "category")
     search_fields = ("name", "brand")
+    ordering = ("-display_priority", "-created_at")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [
         ProductImageInline,
@@ -115,6 +117,23 @@ class OrderAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     search_fields = ("order_number", "phone", "full_name")
     inlines = [OrderItemInline]
+    # Status must not be editable here — paid is set only via payment activation /
+    # authorized card confirm; other transitions go through the panel set_status API.
+    readonly_fields = ("status",)
+
+    def save_model(self, request, obj, form, change):
+        from django.core.exceptions import ValidationError
+
+        from app.services.order_payment_access import manual_status_change_error
+
+        if change and obj.pk:
+            previous = (
+                Order.objects.filter(pk=obj.pk).values_list("status", flat=True).first()
+            )
+            err = manual_status_change_error(previous or "", obj.status)
+            if err:
+                raise ValidationError({"status": err})
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(PaymentGatewayConfig)

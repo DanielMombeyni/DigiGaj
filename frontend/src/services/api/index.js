@@ -146,6 +146,8 @@ export const adminApi = {
     catalog: () => api.get('/admin/sms/catalog/'),
     balance: () => api.get('/admin/sms/balance/'),
     send: (data) => api.post('/admin/sms/send/', data),
+    sendTemplate: (data) => api.post('/admin/sms/send-template/', data),
+    recipients: (params) => api.get('/admin/sms/recipients/', { params }),
     logs: (params) => api.get('/admin/sms/logs/', { params }),
   },
   smsTemplates: {

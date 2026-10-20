@@ -2,6 +2,9 @@ from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from .category import Category, TimeStampedModel
 
+# Upper bound for admin-controlled catalog merchandising weight
+DISPLAY_PRIORITY_MAX = 9999
+
 
 class Product(TimeStampedModel):
     class Condition(models.TextChoices):
@@ -42,6 +45,12 @@ class Product(TimeStampedModel):
     )
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
+    display_priority = models.PositiveIntegerField(
+        default=0,
+        validators=[MaxValueValidator(DISPLAY_PRIORITY_MAX)],
+        verbose_name="اولویت نمایش",
+        help_text="عدد بزرگ‌تر = بالاتر در ترتیب پیشنهادی فروشگاه؛ ۰ = بدون اولویت اضافی",
+    )
     rating = models.DecimalField(
         max_digits=2,
         decimal_places=1,
@@ -54,7 +63,7 @@ class Product(TimeStampedModel):
     meta = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        ordering = ["-display_priority", "-created_at"]
         verbose_name = "محصول"
         verbose_name_plural = "محصولات"
         indexes = [
@@ -62,6 +71,7 @@ class Product(TimeStampedModel):
             models.Index(fields=["category", "is_active"]),
             models.Index(fields=["is_active", "price_toman"]),
             models.Index(fields=["is_active", "-created_at"]),
+            models.Index(fields=["is_active", "-display_priority", "-created_at"]),
         ]
 
     def __str__(self):

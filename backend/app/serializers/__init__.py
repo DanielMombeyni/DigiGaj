@@ -183,6 +183,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             "has_options",
             "is_active",
             "is_featured",
+            "display_priority",
             "rating",
             "category",
             "category_name",
@@ -200,6 +201,9 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_min_price(self, obj):
         if obj.price_on_request:
             return None
+        # Prefer queryset annotation (same rules) when present — avoids divergence
+        if "display_price" in getattr(obj, "__dict__", {}):
+            return obj.display_price
         prices = []
         for v in obj.variants.all():
             if not v.is_active:
@@ -313,6 +317,7 @@ class ProductWriteSerializer(serializers.ModelSerializer):
             "stock",
             "is_active",
             "is_featured",
+            "display_priority",
             "rating",
             "specs",
             "meta",

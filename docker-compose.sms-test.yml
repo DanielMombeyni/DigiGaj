@@ -1,0 +1,35 @@
+# Isolated PostgreSQL for DigiGaj SMS database-backed pytest only.
+# Project name is fixed below — always use this file with:
+#   docker compose -f docker-compose.sms-test.yml ...
+# Do NOT use docker-compose.dev.yml or docker-compose.prod.yml for these tests.
+# Do NOT run `docker compose down -v` against this stack unless you intentionally
+# destroy the disposable test volume (not documented as a routine step).
+
+name: digigaj-sms-test
+
+services:
+  pg:
+    image: postgres:16-alpine
+    container_name: digigaj-sms-test-pg
+    environment:
+      # Explicit test-only identity — not read from the active application .env
+      POSTGRES_DB: sms_pytest
+      POSTGRES_USER: sms_pytest
+      POSTGRES_PASSWORD: sms_pytest_isolated_only
+    volumes:
+      - sms_pytest_pgdata:/var/lib/postgresql/data
+    ports:
+      # Host access for pytest on the workstation; loopback only, dedicated port
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sms_pytest -d sms_pytest"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    restart: "no"
+
+volumes:
+  sms_pytest_pgdata:
+    # Explicit Docker volume name — never postgres_data_dev / postgres_data_prod
+    name: digigaj_sms_pytest_pgdata

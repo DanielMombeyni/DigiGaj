@@ -37,6 +37,8 @@ from app.views.sms_views import (
 from app.views.sms_panel_views import (
     AdminSmsBalanceView,
     AdminSmsPanelCatalogView,
+    AdminSmsRecipientsView,
+    AdminSmsSendTemplateView,
     AdminSmsSendView,
     AdminSmsTemplateDetailView,
     AdminSmsTemplateListView,
@@ -111,6 +113,16 @@ urlpatterns = [
     path("admin/sms/catalog/", AdminSmsPanelCatalogView.as_view(), name="admin-sms-panel-catalog"),
     path("admin/sms/balance/", AdminSmsBalanceView.as_view(), name="admin-sms-balance"),
     path("admin/sms/send/", AdminSmsSendView.as_view(), name="admin-sms-send"),
+    path(
+        "admin/sms/send-template/",
+        AdminSmsSendTemplateView.as_view(),
+        name="admin-sms-send-template",
+    ),
+    path(
+        "admin/sms/recipients/",
+        AdminSmsRecipientsView.as_view(),
+        name="admin-sms-recipients",
+    ),
     path("admin/sms/logs/", AdminSmsLogListView.as_view(), name="admin-sms-logs"),
     path("admin/sms-templates/", AdminSmsTemplateListView.as_view(), name="admin-sms-templates"),
     path(

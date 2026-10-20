@@ -45,7 +45,10 @@ const emptyForm = () => ({
   description: '',
   is_active: true,
   is_featured: false,
+  display_priority: 0,
 })
+
+const DISPLAY_PRIORITY_MAX = 9999
 
 function discountPercentFromCompare(price, compareAt) {
   const p = Number(price)
@@ -561,6 +564,10 @@ export default function AdminProductsPage() {
         description: data.description || '',
         is_active: data.is_active !== false,
         is_featured: !!data.is_featured,
+        display_priority: Math.min(
+          DISPLAY_PRIORITY_MAX,
+          Math.max(0, Number(data.display_priority) || 0),
+        ),
       })
       const cols = (data.colors || []).map((c, i) => ({
         key: nextKey(),
@@ -659,6 +666,16 @@ export default function AdminProductsPage() {
       setLoading(false)
       return
     }
+    const priorityRaw = Number(form.display_priority)
+    if (
+      !Number.isInteger(priorityRaw) ||
+      priorityRaw < 0 ||
+      priorityRaw > DISPLAY_PRIORITY_MAX
+    ) {
+      setError(`اولویت نمایش باید عدد صحیح بین ۰ و ${DISPLAY_PRIORITY_MAX} باشد`)
+      setLoading(false)
+      return
+    }
     const payload = {
       ...formFields,
       category: form.category ? Number(form.category) : null,
@@ -666,6 +683,7 @@ export default function AdminProductsPage() {
       price_toman: form.price_on_request ? 0 : Number(form.price_toman),
       compare_at_price_toman: compareAt,
       stock: Number(form.stock) || 0,
+      display_priority: priorityRaw,
       slug: form.slug || form.name.replace(/\s+/g, '-'),
       colors: colors
         .filter((c) => c.name.trim())
@@ -1113,6 +1131,21 @@ export default function AdminProductsPage() {
             <label className="block sm:col-span-2">
               <span className="label">توضیحات</span>
               <textarea className="input min-h-[80px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </label>
+            <label className="block sm:col-span-2">
+              <span className="label">اولویت نمایش</span>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={DISPLAY_PRIORITY_MAX}
+                step={1}
+                value={form.display_priority}
+                onChange={(e) => setForm({ ...form, display_priority: e.target.value })}
+              />
+              <span className="mt-1 block text-[11px] text-ink-700/40">
+                عدد بزرگ‌تر = نمایش بالاتر در ترتیب پیشنهادی؛ ۰ = بدون اولویت
+              </span>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} />

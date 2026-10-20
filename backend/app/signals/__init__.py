@@ -42,9 +42,14 @@ def notify_order_status_sms(sender, instance, created, **kwargs):
     if previous is None or previous == instance.status:
         return
     try:
-        from app.services.sms_dispatch import queue_order_status_sms
+        from app.services.sms_dispatch import (
+            queue_order_shipment_sms,
+            queue_order_status_sms,
+        )
 
         queue_order_status_sms(instance, previous)
+        # Dedicated shipment/delivery events when status becomes shipped/delivered.
+        queue_order_shipment_sms(instance, previous)
     except Exception:
         import logging
 
