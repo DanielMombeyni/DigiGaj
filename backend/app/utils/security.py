@@ -25,18 +25,26 @@ def validate_production_secret_key(secret: str | None) -> None:
     Safe to call from settings; raises ImproperlyConfigured on failure.
     """
     value = str(secret or "").strip()
+    _hint = (
+        "Edit the project root .env on the server: set DJANGO_SECRET_KEY to a long random "
+        "value (at least 32 characters), then recreate/restart the backend container. "
+        "Do not use values from .env.example."
+    )
     if not value or value in KNOWN_INSECURE_SECRET_KEYS:
         raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY must be set to a unique non-default value in production."
+            "DJANGO_SECRET_KEY must be set to a unique non-default value in production. "
+            + _hint
         )
     if len(value) < MIN_PRODUCTION_SECRET_KEY_LENGTH:
         raise ImproperlyConfigured(
             "DJANGO_SECRET_KEY must be at least "
-            f"{MIN_PRODUCTION_SECRET_KEY_LENGTH} characters in production."
+            f"{MIN_PRODUCTION_SECRET_KEY_LENGTH} characters in production. "
+            + _hint
         )
     # Catch common "django-insecure-..." style keys even if longer than the minimum.
     lowered = value.lower()
     if lowered.startswith("django-insecure") or "insecure-dev-key" in lowered:
         raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY looks like a development placeholder; set a strong production key."
+            "DJANGO_SECRET_KEY looks like a development placeholder; set a strong production key. "
+            + _hint
         )
