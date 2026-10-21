@@ -201,3 +201,117 @@ def test_price_stats_includes_category_descendants_and_excludes_on_request(api):
     assert empty_res.data["max_price"] is None
 
     assert elsewhere.id and on_req.id and in_root.id
+
+
+@pytest.mark.django_db
+def test_brands_filter_matches_any_of_list():
+    a = _product(brand="Samsung", slug="br-a", sku="SKU-BR-A")
+    b = _product(brand="Apple", slug="br-b", sku="SKU-BR-B")
+    c = _product(brand="Xiaomi", slug="br-c", sku="SKU-BR-C")
+    none = _product(brand="", slug="br-none", sku="SKU-BR-N")
+
+    qs = Product.objects.filter(id__in=[a.id, b.id, c.id, none.id])
+    filtered = ProductFilter(data={"brands": "Samsung,Xiaomi"}, queryset=qs).qs
+    ids = set(filtered.values_list("id", flat=True))
+    assert a.id in ids
+    assert c.id in ids
+    assert b.id not in ids
+    assert none.id not in ids
+
+    single = ProductFilter(data={"brands": "apple"}, queryset=qs).qs
+    single_ids = set(single.values_list("id", flat=True))
+    assert single_ids == {b.id}
+
+
+@pytest.mark.django_db
+def test_colors_filter_by_hex_code():
+    red = _product(slug="col-red", sku="SKU-CR")
+    red_hex = ProductColor.objects.create(product=red, name="قرمز", hex_code="#ff0000")
+    _variant(red, color_name="extra")
+
+    green = _product(slug="col-green", sku="SKU-CG")
+    ProductColor.objects.create(product=green, name="سبز", hex_code="#00ff00")
+
+    plain = _product(slug="col-plain", sku="SKU-CP")
+
+    qs = Product.objects.filter(id__in=[red.id, green.id, plain.id])
+    filtered = ProductFilter(data={"colors": "#ff0000"}, queryset=qs).qs
+    ids = set(filtered.values_list("id", flat=True))
+    assert ids == {red.id}
+
+    multi = ProductFilter(data={"colors": "#ff0000,#00ff00"}, queryset=qs).qs
+    multi_ids = set(multi.values_list("id", flat=True))
+    assert multi_ids == {red.id, green.id}
+
+    assert red_hex.hex_code == "#ff0000"
+
+
+@pytest.mark.django_db
+def test_in_stock_filter_variant_and_self_stock():
+    # Product with a stocked active variant -> in stock
+    with_var = _product(stock=0, slug="st-var", sku="SKU-ST-V")
+    _variant(with_var, color_name="v")
+
+    # Product whose only variant is out of stock -> not in stock
+    out_var = _product(stock=10, slug="st-out", sku="SKU-ST-O")
+    variant = _variant(out_var, color_name="o")
+    variant.stock = 0
+    variant.save(update_fields=["stock"])
+
+    # Product with no variants but self stock -> in stock
+    self_stock = _product(stock=4, slug="st-self", sku="SKU-ST-S")
+
+    # Product with no variants and no stock -> not in stock
+    empty = _product(stock=0, slug="st-empty", sku="SKU-ST-E")
+
+    qs = Product.objects.filter(id__in=[with_var.id, out_var.id, self_stock.id, empty.id])
+
+    in_ids = set(
+        ProductFilter(data={"in_stock": "true"}, queryset=qs).qs.values_list("id", flat=True)
+    )
+    assert in_ids == {with_var.id, self_stock.id}
+
+    out_ids = set(
+        ProductFilter(data={"in_stock": "false"}, queryset=qs).qs.values_list("id", flat=True)
+    )
+    assert out_ids == {out_var.id, empty.id}
+
+
+@pytest.mark.django_db
+def test_filter_facets_endpoint_brands_and_colors(api):
+    root = Category.objects.create(name="Root", slug="root-fc", sort_order=1)
+    child = Category.objects.create(name="Child", slug="child-fc", parent=root, sort_order=1)
+    other = Category.objects.create(name="Other", slug="other-fc", sort_order=2)
+
+    a = _product(brand="Samsung", slug="fc-a", sku="SKU-FC-A", category=child)
+    ProductColor.objects.create(product=a, name="قرمز", hex_code="#ff0000")
+
+    b = _product(brand="Apple", slug="fc-b", sku="SKU-FC-B", category=root)
+    ProductColor.objects.create(product=b, name="سبز", hex_code="#00ff00")
+
+    # Same hex as (a) in another category -> counted separately but not duplicated as facet
+    c = _product(brand="Samsung", slug="fc-c", sku="SKU-FC-C", category=other)
+    ProductColor.objects.create(product=c, name="قرمز", hex_code="#FF0000")
+
+    # Inactive product must not contribute facets
+    inactive = _product(
+        brand="Ghost", slug="fc-inactive", sku="SKU-FC-I", category=root, is_active=False
+    )
+    ProductColor.objects.create(product=inactive, name="آبی", hex_code="#0000ff")
+
+    res = api.get("/api/v1/products/facets/")
+    assert res.status_code == 200
+    brands = [row["brand"] for row in res.data["brands"]]
+    assert brands == ["Apple", "Samsung"]
+    color_hexes = {row["hex_code"].lower() for row in res.data["colors"]}
+    assert color_hexes == {"#ff0000", "#00ff00"}
+
+    # Scoped by category (root + descendants) -> excludes "other" and inactive
+    scoped = api.get("/api/v1/products/facets/", {"category": root.id})
+    assert scoped.status_code == 200
+    scoped_brands = [row["brand"] for row in scoped.data["brands"]]
+    assert scoped_brands == ["Apple", "Samsung"]
+    scoped_hexes = {row["hex_code"].lower() for row in scoped.data["colors"]}
+    assert scoped_hexes == {"#ff0000", "#00ff00"}
+
+    assert inactive.is_active is False

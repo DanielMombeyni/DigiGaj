@@ -6,6 +6,7 @@ export const shopApi = {
   config: () => api.get('/storefront/config/'),
   products: (params) => api.get('/products/', { params }),
   productPriceStats: (params) => api.get('/products/price-stats/', { params }),
+  productFacets: (params) => api.get('/products/facets/', { params }),
   product: (slug) => api.get(`/products/${slug}/`),
   categories: (params) => api.get('/categories/', { params }),
   page: (slug) => api.get(`/pages/${slug}/`),
@@ -76,6 +77,12 @@ export const adminApi = {
       return api.post(`/products/${slug}/images/`, fd)
     },
     deleteImage: (slug, imageId) => api.delete(`/products/${slug}/images/${imageId}/`),
+    uploadColorImage: (slug, colorId, file) => {
+      const fd = new FormData()
+      fd.append('image', file)
+      return api.post(`/products/${slug}/colors/${colorId}/image/`, fd)
+    },
+    deleteColorImage: (slug, colorId) => api.delete(`/products/${slug}/colors/${colorId}/image/`),
   },
   categories: {
     list: (params) => api.get('/categories/', { params: { page_size: 100, ...params } }),

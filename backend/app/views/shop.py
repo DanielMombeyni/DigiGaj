@@ -21,6 +21,7 @@ from app.models import (
     Order,
     PaymentGatewayConfig,
     Product,
+    ProductColor,
     ProductImage,
     ProductVariant,
     PurchaseTransaction,
@@ -35,6 +36,7 @@ from app.serializers import (
     CreateOrderSerializer,
     DiscountCodeSerializer,
     OrderSerializer,
+    ProductColorSerializer,
     ProductDetailSerializer,
     ProductImageSerializer,
     ProductListSerializer,
@@ -297,6 +299,40 @@ class ProductViewSet(viewsets.ModelViewSet):
         if not deleted:
             return Response({"detail": "یافت نشد"}, status=404)
         return Response(status=204)
+
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        url_path=r"colors/(?P<color_id>[0-9]+)/image",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def color_image(self, request, slug=None, color_id=None):
+        """Set (POST, multipart `image`) or clear (DELETE) a color's image."""
+        product = self.get_object()
+        color = product.colors.filter(pk=color_id).first()
+        if color is None:
+            return Response({"detail": "رنگ یافت نشد"}, status=404)
+
+        if request.method == "DELETE":
+            if color.image:
+                color.image.delete(save=False)
+            color.image = None
+            color.save(update_fields=["image", "updated_at"])
+            return Response(
+                ProductColorSerializer(color, context={"request": request}).data
+            )
+
+        f = request.FILES.get("image")
+        if not f:
+            return Response({"detail": "فایل تصویر ارسال نشده"}, status=400)
+        if color.image:
+            color.image.delete(save=False)
+        color.image = f
+        color.save(update_fields=["image", "updated_at"])
+        return Response(
+            ProductColorSerializer(color, context={"request": request}).data,
+            status=201,
+        )
 
 
 class DiscountCodeViewSet(viewsets.ModelViewSet):
@@ -605,6 +641,72 @@ def product_price_stats(request):
             "max_price": int(max_price) if has_priced else None,
             "priced_count": int(agg["priced_count"] or 0),
             "has_priced_products": has_priced,
+        }
+    )
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def product_filter_facets(request):
+    """
+    Distinct filter facets (brands + colors) for the products filter sidebar.
+
+    Scope matches list filtering: active products, optional category including
+    descendants. Colors are aggregated by hex_code (lowercased) so the same
+    color across products collapses into one facet.
+    """
+    qs = Product.objects.filter(is_active=True)
+    category = (request.query_params.get("category") or "").strip()
+    if category:
+        if category.isdigit():
+            qs = qs.filter(category_id__in=category_with_descendants(int(category)))
+        else:
+            cat = Category.objects.filter(slug=category).only("id").first()
+            if cat is None:
+                qs = qs.none()
+            else:
+                qs = qs.filter(category_id__in=category_with_descendants(cat.id))
+
+    brands = sorted(
+        {b for b in qs.exclude(brand="").exclude(brand__isnull=True).values_list("brand", flat=True)}
+    )
+
+    color_rows = (
+        ProductColor.objects.filter(product__in=qs)
+        .exclude(hex_code="")
+        .values("hex_code")
+        .annotate(product_count=Count("product_id", distinct=True))
+        .order_by()
+    )
+    hexes = [row["hex_code"] for row in color_rows]
+    name_by_hex: dict[str, str] = {}
+    if hexes:
+        for row in (
+            ProductColor.objects.filter(product__in=qs, hex_code__in=hexes)
+            .exclude(name="")
+            .values("hex_code", "name")
+            .distinct()
+        ):
+            name_by_hex.setdefault((row["hex_code"] or "").lower(), row["name"])
+
+    colors = []
+    for row in color_rows:
+        key = (row["hex_code"] or "").lower()
+        if not key:
+            continue
+        colors.append(
+            {
+                "name": name_by_hex.get(key, ""),
+                "hex_code": row["hex_code"],
+                "product_count": int(row["product_count"] or 0),
+            }
+        )
+    colors.sort(key=lambda c: c["name"] or c["hex_code"])
+
+    return Response(
+        {
+            "brands": [{"brand": b} for b in brands],
+            "colors": colors,
         }
     )
 

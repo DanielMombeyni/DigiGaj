@@ -566,6 +566,7 @@ export default function AdminProductsPage() {
   }, [newFilePreviews])
 
   const resetExtras = () => {
+    colors.forEach((c) => c.imagePreview && URL.revokeObjectURL(c.imagePreview))
     setColors([])
     setSizes([])
     setVariants([])
@@ -614,12 +615,17 @@ export default function AdminProductsPage() {
           Math.max(0, Number(data.display_priority) || 0),
         ),
       })
+      colors.forEach((c) => c.imagePreview && URL.revokeObjectURL(c.imagePreview))
       const cols = (data.colors || []).map((c, i) => ({
         key: nextKey(),
         id: c.id,
         name: c.name,
         hex_code: c.hex_code || '',
         sort_order: i,
+        image: c.image || null,
+        imageFile: null,
+        imagePreview: null,
+        clearImage: false,
       }))
       const szs = (data.sizes || []).map((s, i) => ({
         key: nextKey(),
@@ -775,15 +781,34 @@ export default function AdminProductsPage() {
     payload.price_on_request = form.price_on_request === true
     try {
       let slug = editing?.slug
+      let savedColors = []
       if (editing) {
         const { data } = await adminApi.products.update(editing.slug, payload)
         slug = data.slug
+        savedColors = data.colors || []
       } else {
         const { data } = await adminApi.products.create(payload)
         slug = data.slug
+        savedColors = data.colors || []
       }
       if (newFiles.length && slug) {
         await adminApi.products.uploadImages(slug, newFiles)
+      }
+      // Per-color images: backend sync keeps the submitted order (sort_order =
+      // row index), so saved colors align by index with the sent color rows.
+      if (slug && savedColors.length) {
+        const colorRows = colors.filter((c) => c.name.trim())
+        const colorJobs = []
+        colorRows.forEach((row, i) => {
+          const saved = savedColors[i]
+          if (!saved?.id) return
+          if (row.imageFile) {
+            colorJobs.push(adminApi.products.uploadColorImage(slug, saved.id, row.imageFile))
+          } else if (row.clearImage && row.image) {
+            colorJobs.push(adminApi.products.deleteColorImage(slug, saved.id))
+          }
+        })
+        if (colorJobs.length) await Promise.all(colorJobs)
       }
       setOpen(false)
       navigate(`${PANEL_BASE}/products`, { replace: true })
@@ -1270,12 +1295,19 @@ export default function AdminProductsPage() {
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-ink-900">رنگ‌ها</h3>
-                <p className="text-xs text-ink-700/45">اختیاری — می‌توانید بدون رنگ بگذارید</p>
+                <p className="text-xs text-ink-700/45">
+                  اختیاری — برای هر رنگ می‌توانید تصویر جدا بگذارید؛ رنگ بدون تصویر، تصویر پیش‌فرض محصول را نشان می‌دهد
+                </p>
               </div>
               <button
                 type="button"
                 className="btn-secondary inline-flex items-center gap-1 text-xs"
-                onClick={() => setColorsAndRebuild([...colors, { key: nextKey(), name: '', hex_code: '#000000' }])}
+                onClick={() =>
+                  setColorsAndRebuild([
+                    ...colors,
+                    { key: nextKey(), name: '', hex_code: '#000000', image: null, imageFile: null, imagePreview: null, clearImage: false },
+                  ])
+                }
               >
                 <Plus className="h-3.5 w-3.5" /> رنگ
               </button>
@@ -1303,10 +1335,70 @@ export default function AdminProductsPage() {
                       setColorsAndRebuild(next)
                     }}
                   />
+                  <label
+                    className="relative h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-dashed border-mist-300 bg-mist-50 text-ink-700/40 transition hover:border-copper-400/50 hover:text-copper-600"
+                    title="تصویر این رنگ"
+                  >
+                    {c.imagePreview || c.image ? (
+                      <img
+                        src={mediaSrc(c.imagePreview || c.image)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center">
+                        <ImagePlus className="h-4 w-4" />
+                      </span>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        e.target.value = ''
+                        if (!file) return
+                        const next = [...colors]
+                        const prevPreview = c.imagePreview
+                        next[idx] = {
+                          ...c,
+                          imageFile: file,
+                          imagePreview: URL.createObjectURL(file),
+                          clearImage: false,
+                        }
+                        setColors(next)
+                        if (prevPreview) URL.revokeObjectURL(prevPreview)
+                      }}
+                    />
+                  </label>
+                  {(c.image || c.imagePreview) && (
+                    <button
+                      type="button"
+                      title="حذف تصویر این رنگ"
+                      className="text-red-500"
+                      onClick={() => {
+                        const next = [...colors]
+                        const prevPreview = c.imagePreview
+                        next[idx] = {
+                          ...c,
+                          imageFile: null,
+                          imagePreview: null,
+                          clearImage: Boolean(c.image),
+                        }
+                        setColors(next)
+                        if (prevPreview) URL.revokeObjectURL(prevPreview)
+                      }}
+                    >
+                      <ImageOff className="h-4 w-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="text-red-500"
-                    onClick={() => setColorsAndRebuild(colors.filter((_, i) => i !== idx))}
+                    onClick={() => {
+                      if (c.imagePreview) URL.revokeObjectURL(c.imagePreview)
+                      setColorsAndRebuild(colors.filter((_, i) => i !== idx))
+                    }}
                   >
                     <X className="h-4 w-4" />
                   </button>

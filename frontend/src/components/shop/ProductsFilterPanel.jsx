@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom'
 import { Star, X } from 'lucide-react'
 import CategoryFilterTree from '@/components/shop/CategoryFilterTree'
 import PriceRangeSlider from '@/components/shop/PriceRangeSlider'
+import {
+  BrandSection,
+  CollapsibleSection,
+  ColorSection,
+  StockSection,
+} from '@/components/shop/FilterFacetSections'
 import { cn, toman } from '@/utils/format'
 
 /**
@@ -26,6 +32,13 @@ export default function ProductsFilterPanel({
   onFeaturedChange,
   onClearAll,
   hasActiveFilters,
+  facets = { brands: [], colors: [] },
+  brand,
+  onBrandChange,
+  colors,
+  onColorsChange,
+  inStock,
+  onInStockChange,
 }) {
   const titleId = useId()
   const panelRef = useRef(null)
@@ -172,6 +185,18 @@ export default function ProductsFilterPanel({
               </span>
             </button>
           </section>
+
+          <div className="mt-5 space-y-5 border-t border-mist-100 pt-5">
+            <CollapsibleSection title="برند">
+              <BrandSection facets={facets.brands} value={brand} onChange={onBrandChange} />
+            </CollapsibleSection>
+            <CollapsibleSection title="رنگ">
+              <ColorSection facets={facets.colors} value={colors} onChange={onColorsChange} />
+            </CollapsibleSection>
+            <CollapsibleSection title="وضعیت موجودی">
+              <StockSection value={inStock} onChange={onInStockChange} />
+            </CollapsibleSection>
+          </div>
         </div>
       </div>
     </div>,

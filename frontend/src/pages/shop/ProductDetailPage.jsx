@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ZoomIn } from 'lucide-react'
 import { shopApi } from '@/services/api'
 import { useCartStore } from '@/store/cart'
 import { toman } from '@/utils/format'
@@ -8,6 +9,7 @@ import Seo, { productJsonLd } from '@/components/common/Seo'
 import Reveal from '@/components/common/Reveal'
 import ProductGridSection from '@/components/shop/ProductGridSection'
 import BrandLogo from '@/components/common/BrandLogo'
+import ProductImageLightbox from '@/components/dashboard/ProductImageLightbox'
 import { brand } from '@/config/brand'
 import { isPriceOnRequest } from '@/utils/pricing'
 import PriceOnRequestNotice from '@/components/shop/PriceOnRequestNotice'
@@ -19,7 +21,10 @@ export default function ProductDetailPage() {
   const [error, setError] = useState(false)
   const [colorId, setColorId] = useState(null)
   const [sizeId, setSizeId] = useState(null)
-  const [activeImage, setActiveImage] = useState(null)
+  // Manual thumbnail pick — tagged with the color it was made under so a stale
+  // pick can never override a newer color selection (rapid switching safe).
+  const [manual, setManual] = useState(null)
+  const [zoomOpen, setZoomOpen] = useState(false)
   const add = useCartStore((s) => s.add)
 
   useEffect(() => {
@@ -28,7 +33,7 @@ export default function ProductDetailPage() {
     setError(false)
     setColorId(null)
     setSizeId(null)
-    setActiveImage(null)
+    setManual(null)
     shopApi
       .product(slug)
       .then((r) => {
@@ -38,8 +43,6 @@ export default function ProductDetailPage() {
         const sizes = r.data.sizes || []
         if (colors[0]) setColorId(colors[0].id)
         if (sizes[0]) setSizeId(sizes[0].id)
-        const img = r.data.primary_image || r.data.images?.[0]?.image
-        setActiveImage(img || null)
       })
       .catch(() => {
         if (!cancelled) setError(true)
@@ -70,12 +73,48 @@ export default function ProductDetailPage() {
   const canBuy = product?.has_options ? !!selectedVariant && stock > 0 : !!product?.in_stock
 
   const gallery = product?.images || []
+  const colors = product?.colors || []
 
+  // Image for the selected color (fallback: product's default image)
+  const colorImage = colorId
+    ? colors.find((c) => c.id === colorId)?.image || null
+    : null
+  const defaultImage =
+    gallery.find((img) => img.is_primary)?.image ||
+    product?.primary_image ||
+    gallery[0]?.image ||
+    null
+
+  // Thumbnail strip: the selected color's image leads (added when it is not
+  // already part of the gallery), everything else keeps its place.
+  const displayGallery = useMemo(() => {
+    if (!product) return []
+    const imgs = product.images || []
+    if (!colorImage) return imgs
+    if (imgs.some((img) => img.image === colorImage)) return imgs
+    return [{ id: `color-image-${colorId}`, image: colorImage, color: colorId }, ...imgs]
+  }, [product, colorImage, colorId])
+
+  // Fully derived — every render computes the image from the current colorId,
+  // so rapid color switching always shows the last selected color's image.
+  const manualForColor = manual && manual.colorId === colorId ? manual.image : null
+  const image = manualForColor || colorImage || defaultImage
+  const activeImageIndex = Math.max(
+    0,
+    displayGallery.findIndex((img) => img.image === image),
+  )
+
+  // Warm the cache so fast color switching never flashes a blank frame
   useEffect(() => {
-    if (!product || !colorId) return
-    const colorImg = gallery.find((img) => img.color === colorId)
-    if (colorImg?.image) setActiveImage(colorImg.image)
-  }, [colorId, product, gallery])
+    if (!product) return
+    const urls = new Set()
+    colors.forEach((c) => c.image && urls.add(c.image))
+    gallery.forEach((img) => img.image && urls.add(img.image))
+    urls.forEach((src) => {
+      const im = new Image()
+      im.src = src
+    })
+  }, [product, colors, gallery])
 
   if (error) {
     return (
@@ -90,8 +129,6 @@ export default function ProductDetailPage() {
   if (!product) {
     return <LoadingScreen variant="page" label="در حال بارگذاری محصول..." />
   }
-
-  const image = activeImage || product.primary_image || product.images?.[0]?.image
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
@@ -109,7 +146,17 @@ export default function ProductDetailPage() {
         <Reveal className="overflow-hidden rounded-[2rem] border border-mist-200 bg-gradient-to-br from-ink-950 via-ink-900 to-sea-600/30 shadow-soft">
           <div className="aspect-square">
             {image ? (
-              <img src={mediaSrc(image)} alt={product.name} className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setZoomOpen(true)}
+                className="group relative h-full w-full cursor-zoom-in focus-visible:outline-none"
+                aria-label="بزرگ‌نمایی تصویر محصول"
+              >
+                <img src={mediaSrc(image)} alt={product.name} className="h-full w-full object-cover" />
+                <span className="pointer-events-none absolute bottom-3 left-3 rounded-xl bg-ink-950/60 p-2 text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none">
+                  <ZoomIn className="h-4 w-4" strokeWidth={2} />
+                </span>
+              </button>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-3 text-white/80">
                 <span className="font-display text-5xl font-bold">{product.name.slice(0, 1)}</span>
@@ -118,15 +165,17 @@ export default function ProductDetailPage() {
             )}
           </div>
         </Reveal>
-        {gallery.length > 1 && (
+        {displayGallery.length > 1 && (
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {gallery.map((img) => (
+            {displayGallery.map((img, idx) => (
               <button
                 key={img.id}
                 type="button"
-                onClick={() => setActiveImage(img.image)}
+                onClick={() => setManual({ colorId, image: img.image })}
+                aria-label={`نمایش تصویر ${idx + 1} از ${displayGallery.length}`}
+                aria-pressed={image === img.image}
                 className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${
-                  activeImage === img.image ? 'border-copper-500' : 'border-mist-200'
+                  image === img.image ? 'border-copper-500' : 'border-mist-200'
                 }`}
               >
                 <img src={mediaSrc(img.image)} alt="" className="h-full w-full object-cover" />
@@ -303,6 +352,15 @@ export default function ProductDetailPage() {
         products={product.recommended_products}
         linkTo="/products?is_featured=true"
         linkLabel="همه پیشنهادها"
+      />
+
+      {/* Zoom view — always opens on the currently displayed (color) image */}
+      <ProductImageLightbox
+        open={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        title={product.name}
+        images={displayGallery}
+        startIndex={activeImageIndex}
       />
     </div>
   )

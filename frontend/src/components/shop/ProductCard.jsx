@@ -103,9 +103,7 @@ export function ProductCard({ product, density = 'default' }) {
           <h3
             className={cn(
               'line-clamp-2 min-w-0 font-display font-bold leading-5 text-ink-900 transition group-hover:text-copper-600 sm:leading-7',
-              home
-                ? 'mt-0.5 text-sm sm:mt-1 sm:text-base'
-                : 'mt-0.5 text-sm sm:mt-1 sm:text-base',
+              'mt-0.5 text-sm sm:mt-1 sm:text-base',
             )}
           >
             {product.name}
@@ -141,66 +139,75 @@ export function ProductCard({ product, density = 'default' }) {
           {onRequest ? (
             <PriceOnRequestNotice variant="card" />
           ) : (
-            <div
-              className={cn(
-                'flex min-w-0 flex-col gap-1.5',
-                home ? 'sm:flex-row sm:items-end sm:justify-between sm:gap-2' : 'sm:flex-row sm:items-end sm:justify-between sm:gap-2',
-              )}
-            >
-              <div className="min-w-0">
-                <div
-                  className={cn(
-                    'min-w-0 break-words font-bold text-copper-600',
-                    home ? 'text-[11px] leading-4 sm:truncate sm:text-sm' : 'truncate text-xs sm:text-sm',
-                  )}
-                >
-                  {product.has_options &&
-                  product.min_price != null &&
-                  product.min_price !== product.price_toman
-                    ? `از ${toman(displayPrice)}`
-                    : toman(displayPrice)}
-                </div>
-                {discount > 0 && (
-                  <div className="text-[10px] text-ink-700/35 line-through sm:text-xs">
-                    {toman(product.compare_at_price_toman)}
-                  </div>
+            <div className="min-w-0">
+              <div
+                className={cn(
+                  'min-w-0 break-words font-bold text-copper-600',
+                  home ? 'text-[11px] leading-4 sm:truncate sm:text-sm' : 'truncate text-xs sm:text-sm',
                 )}
+              >
+                {product.has_options &&
+                product.min_price != null &&
+                product.min_price !== product.price_toman
+                  ? `از ${toman(displayPrice)}`
+                  : toman(displayPrice)}
               </div>
-              {product.has_options ? (
-                <Link
-                  to={`/products/${product.slug}`}
-                  className={cn(
-                    'cursor-pointer rounded-lg bg-ink-950 text-center font-semibold text-white transition hover:bg-copper-500',
-                    home
-                      ? 'px-2 py-1.5 text-[10px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs'
-                      : 'px-2.5 py-1.5 text-[11px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs',
-                  )}
-                >
-                  انتخاب
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!product.in_stock}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    add(product, 1)
-                  }}
-                  className={cn(
-                    'cursor-pointer rounded-lg bg-ink-950 font-semibold text-white transition hover:bg-copper-500 disabled:cursor-not-allowed disabled:opacity-40',
-                    home
-                      ? 'px-2 py-1.5 text-[10px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs'
-                      : 'px-2.5 py-1.5 text-[11px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs',
-                  )}
-                  aria-label={`افزودن ${product.name} به سبد`}
-                >
-                  {product.in_stock ? 'افزودن' : 'ناموجود'}
-                </button>
+              {discount > 0 && (
+                <div className="text-[10px] text-ink-700/35 line-through sm:text-xs">
+                  {toman(product.compare_at_price_toman)}
+                </div>
               )}
             </div>
+          )}
+
+          {/* Call-to-action — full-width dark button (default density) or compact inline (home). */}
+          {onRequest ? (
+            <ProductCardCta
+              home={home}
+              to={`/products/${product.slug}`}
+              label="مشاهده محصول"
+            />
+          ) : product.has_options ? (
+            <ProductCardCta home={home} to={`/products/${product.slug}`} label="انتخاب" />
+          ) : product.in_stock ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                add(product, 1)
+              }}
+              className={cn(
+                'w-full cursor-pointer rounded-xl bg-ink-950 font-semibold text-white transition hover:bg-copper-500',
+                home
+                  ? 'px-2 py-1.5 text-[10px] sm:px-3 sm:py-2 sm:text-xs'
+                  : 'px-3 py-2.5 text-xs sm:py-2.5 sm:text-sm',
+              )}
+              aria-label={`افزودن ${product.name} به سبد`}
+            >
+              افزودن به سبد
+            </button>
+          ) : (
+            <ProductCardCta home={home} to={`/products/${product.slug}`} label="مشاهده محصول" />
           )}
         </div>
       </div>
     </article>
+  )
+}
+
+/** Full-width (default) / inline (home) dark button that navigates to the product. */
+function ProductCardCta({ home, to, label }) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        'block w-full cursor-pointer rounded-xl bg-ink-950 text-center font-semibold text-white transition hover:bg-copper-500',
+        home
+          ? 'px-2 py-1.5 text-[10px] sm:px-3 sm:py-2 sm:text-xs'
+          : 'px-3 py-2.5 text-xs sm:py-2.5 sm:text-sm',
+      )}
+    >
+      {label}
+    </Link>
   )
 }

@@ -1,7 +1,8 @@
 import django_filters
+from django.db.models import Exists, OuterRef, Q
 from rest_framework.filters import OrderingFilter
 
-from app.models import Category, Product
+from app.models import Category, Product, ProductColor, ProductVariant
 from app.services.product_display_price import (
     DISPLAY_PRICE_ANNOTATION,
     annotate_display_price,
@@ -69,6 +70,9 @@ class ProductFilter(django_filters.FilterSet):
     max_price = django_filters.NumberFilter(method="filter_max_price")
     min_rating = django_filters.NumberFilter(method="filter_min_rating")
     brand = django_filters.CharFilter(field_name="brand", lookup_expr="iexact")
+    brands = django_filters.CharFilter(method="filter_brands")
+    colors = django_filters.CharFilter(method="filter_colors")
+    in_stock = django_filters.BooleanFilter(method="filter_in_stock")
     condition = django_filters.CharFilter(field_name="condition")
     is_featured = django_filters.BooleanFilter(field_name="is_featured")
     is_active = django_filters.BooleanFilter(field_name="is_active")
@@ -83,6 +87,9 @@ class ProductFilter(django_filters.FilterSet):
             "max_price",
             "min_rating",
             "brand",
+            "brands",
+            "colors",
+            "in_stock",
             "condition",
             "is_featured",
             "is_active",
@@ -118,6 +125,53 @@ class ProductFilter(django_filters.FilterSet):
         if value is None:
             return queryset
         return queryset.filter(rating__gte=value).exclude(rating=0)
+
+    def filter_brands(self, queryset, name, value):
+        """Comma-separated list of brand names (case-insensitive exact match)."""
+        if not value:
+            return queryset
+        brands = [b.strip() for b in value.split(",") if b.strip()]
+        if not brands:
+            return queryset
+        condition = Q()
+        for brand in brands:
+            condition |= Q(brand__iexact=brand)
+        return queryset.filter(condition)
+
+    def filter_colors(self, queryset, name, value):
+        """
+        Comma-separated list of color hex codes (e.g. "#ff0000,#00ff00").
+        A product matches if any of its colors matches any of the given hex codes.
+        """
+        if not value:
+            return queryset
+        hexes = {h.strip().lower() for h in value.split(",") if h.strip()}
+        if not hexes:
+            return queryset
+        matching_colors = ProductColor.objects.filter(hex_code__in=hexes)
+        return queryset.filter(Exists(matching_colors.filter(product_id=OuterRef("pk"))))
+
+    def filter_in_stock(self, queryset, name, value):
+        """
+        Boolean filter: products that are currently in stock.
+        A product is in stock if any of its active variants has stock > 0,
+        or if the product itself (no variants) has stock > 0.
+        """
+        if value is None:
+            return queryset
+        stocked_variant = ProductVariant.objects.filter(
+            product_id=OuterRef("pk"), is_active=True, stock__gt=0
+        )
+        any_variant = ProductVariant.objects.filter(product_id=OuterRef("pk"))
+        queryset = queryset.annotate(
+            _has_stocked_variant=Exists(stocked_variant),
+            _has_any_variant=Exists(any_variant),
+        )
+        if value:
+            return queryset.filter(Q(_has_stocked_variant=True) | Q(_has_any_variant=False, stock__gt=0))
+        return queryset.filter(
+            Q(_has_stocked_variant=False) & (Q(_has_any_variant=True) | Q(stock__lte=0))
+        )
 
     def filter_queryset(self, queryset):
         qs = super().filter_queryset(queryset)

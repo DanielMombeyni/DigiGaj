@@ -118,9 +118,16 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 
 class ProductColorSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = ProductColor
-        fields = ("id", "name", "hex_code", "sort_order")
+        fields = ("id", "name", "hex_code", "sort_order", "image")
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        return _abs_media(obj.image.url, self.context.get("request"))
 
 
 class ProductSizeSerializer(serializers.ModelSerializer):

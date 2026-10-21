@@ -122,6 +122,13 @@ class ProductColor(TimeStampedModel):
     )
     name = models.CharField(max_length=80)
     hex_code = models.CharField(max_length=7, blank=True, help_text="#RRGGBB")
+    image = models.ImageField(
+        upload_to="products/colors/",
+        null=True,
+        blank=True,
+        verbose_name="تصویر رنگ",
+        help_text="خالی = استفاده از تصویر پیش‌فرض محصول",
+    )
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
