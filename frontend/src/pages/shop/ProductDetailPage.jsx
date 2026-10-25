@@ -41,8 +41,9 @@ export default function ProductDetailPage() {
         setProduct(r.data)
         const colors = r.data.colors || []
         const sizes = r.data.sizes || []
-        if (colors[0]) setColorId(colors[0].id)
-        if (sizes[0]) setSizeId(sizes[0].id)
+        const metadata = r.data.crawler_metadata
+        setColorId(metadata ? metadata.color_id : colors[0]?.id ?? null)
+        setSizeId(metadata ? metadata.size_id : sizes[0]?.id ?? null)
       })
       .catch(() => {
         if (!cancelled) setError(true)
@@ -66,11 +67,20 @@ export default function ProductDetailPage() {
   }, [product, colorId, sizeId])
 
   const price = selectedVariant?.effective_price ?? product?.price_toman
-  const onRequest = isPriceOnRequest(product)
+  const onRequest = product?.crawler_metadata
+    ? product.crawler_metadata.price == null
+    : isPriceOnRequest(product)
   const stock = product?.has_options
     ? selectedVariant?.stock ?? 0
     : product?.stock ?? 0
   const canBuy = product?.has_options ? !!selectedVariant && stock > 0 : !!product?.in_stock
+  const displayedMetadata = product?.crawler_metadata ? {
+    ...product.crawler_metadata,
+    price: onRequest ? null : price,
+    old_price: !onRequest && product.compare_at_price_toman > price
+      ? product.compare_at_price_toman : null,
+    availability: canBuy && !onRequest && price > 0 ? 'instock' : 'outofstock',
+  } : undefined
 
   const gallery = product?.images || []
   const colors = product?.colors || []
@@ -80,6 +90,7 @@ export default function ProductDetailPage() {
     ? colors.find((c) => c.id === colorId)?.image || null
     : null
   const defaultImage =
+    product?.crawler_metadata?.image ||
     gallery.find((img) => img.is_primary)?.image ||
     product?.primary_image ||
     gallery[0]?.image ||
@@ -136,9 +147,10 @@ export default function ProductDetailPage() {
         title={product.name}
         description={product.short_description || product.description || `خرید ${product.name} از ${brand.name}`}
         path={`/products/${product.slug}`}
-        image={mediaSrc(image) || '/vite.svg'}
+        image={product.crawler_metadata?.image || undefined}
+        productMetadata={displayedMetadata}
         type="product"
-        jsonLd={productJsonLd(product)}
+        jsonLd={productJsonLd({ ...product, crawler_metadata: displayedMetadata })}
       />
 
       <div className="grid gap-10 md:grid-cols-2">

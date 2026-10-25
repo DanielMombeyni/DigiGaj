@@ -9,8 +9,14 @@ from drf_spectacular.views import (
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from app.serializers.auth_token import EmailOrUsernameTokenView
+from app.views.product_html import product_detail_html, product_sitemap, robots_txt, sitemap_index
 
 urlpatterns = [
+    path("products/<str:slug>", product_detail_html, name="public-product"),
+    path("products/<str:slug>/", product_detail_html),
+    path("sitemap.xml", sitemap_index, name="sitemap-index"),
+    path("sitemap-products.xml", product_sitemap, name="product-sitemap"),
+    path("robots.txt", robots_txt, name="robots"),
     path("admin/", admin.site.urls),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(

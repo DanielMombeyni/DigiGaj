@@ -108,6 +108,7 @@ EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@gadgetstore.local")
 
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+FRONTEND_HTML_URL = env("FRONTEND_HTML_URL", default="http://frontend/index.html")
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5173", "http://127.0.0.1:5173"],

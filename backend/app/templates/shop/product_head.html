@@ -1,0 +1,18 @@
+<title>{{ product.name }} | دیجی گج</title>
+<meta name="description" content="{{ description }}">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="{{ metadata.url }}">
+<meta property="og:title" content="{{ product.name }} | دیجی گج">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:type" content="product">
+<meta property="og:url" content="{{ metadata.url }}">
+<meta property="og:locale" content="fa_IR">
+<meta property="og:site_name" content="دیجی گج">
+{% if metadata.image %}<meta property="og:image" content="{{ metadata.image }}">{% endif %}
+<meta name="product_id" content="{{ metadata.product_id }}" data-product-meta>
+<meta name="product_name" content="{{ metadata.product_name }}" data-product-meta>
+{% if metadata.price != None %}<meta name="product_price" content="{{ metadata.price }}" data-product-meta>{% endif %}
+{% if metadata.old_price != None %}<meta name="product_old_price" content="{{ metadata.old_price }}" data-product-meta>{% endif %}
+<meta name="availability" content="{{ metadata.availability }}" data-product-meta>
+{% if metadata.guarantee %}<meta name="guarantee" content="{{ metadata.guarantee }}" data-product-meta>{% endif %}
+<script id="seo-jsonld" type="application/ld+json">{{ json_ld|safe }}</script>

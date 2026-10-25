@@ -238,6 +238,7 @@ def _related_product_queryset():
 
 
 class ProductDetailSerializer(ProductListSerializer):
+    crawler_metadata = serializers.SerializerMethodField()
     images = ProductImageSerializer(many=True, read_only=True)
     colors = ProductColorSerializer(many=True, read_only=True)
     sizes = ProductSizeSerializer(many=True, read_only=True)
@@ -248,6 +249,7 @@ class ProductDetailSerializer(ProductListSerializer):
 
     class Meta(ProductListSerializer.Meta):
         fields = ProductListSerializer.Meta.fields + (
+            "crawler_metadata",
             "description",
             "specs",
             "meta",
@@ -260,6 +262,11 @@ class ProductDetailSerializer(ProductListSerializer):
             "recommended_products",
             "created_at",
         )
+
+    def get_crawler_metadata(self, obj):
+        from app.services.product_metadata import product_metadata
+
+        return product_metadata(obj)
 
     def _serialize_related(self, queryset):
         return ProductListSerializer(

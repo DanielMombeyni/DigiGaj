@@ -52,6 +52,12 @@ export default defineConfig({
       protocol: 'ws',
     },
     proxy: {
+      // Exact product documents only; /index.html must stay on Vite so the
+      // backend can fetch the transformed shell without a proxy loop.
+      '^/(products/[^/?]+/?|sitemap\\.xml|sitemap-products\\.xml|robots\\.txt)(\\?.*)?$': {
+        target: process.env.VITE_PROXY_TARGET || 'http://backend:8000',
+        changeOrigin: true,
+      },
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'http://backend:8000',
         changeOrigin: true,
