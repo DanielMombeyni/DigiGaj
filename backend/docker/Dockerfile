@@ -12,7 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements/ /tmp/requirements/
 ARG REQUIREMENTS_FILE=dev.txt
-RUN pip install --upgrade pip && pip install -r /tmp/requirements/${REQUIREMENTS_FILE}
+ARG PIP_FALLBACK_INDEX_URL=https://mirror-pypi.runflare.com/simple
+RUN (python -m pip install --upgrade pip --index-url https://pypi.org/simple --timeout 30 --retries 1 \
+     || { echo "Primary PyPI failed upgrading pip; retrying with ${PIP_FALLBACK_INDEX_URL}"; \
+          python -m pip install --upgrade pip --index-url "${PIP_FALLBACK_INDEX_URL}" --timeout 60 --retries 2; }) \
+    && (python -m pip install -r "/tmp/requirements/${REQUIREMENTS_FILE}" \
+          --index-url https://pypi.org/simple --timeout 30 --retries 1 \
+        || { echo "Primary PyPI failed installing requirements; retrying with ${PIP_FALLBACK_INDEX_URL}"; \
+             python -m pip install -r "/tmp/requirements/${REQUIREMENTS_FILE}" \
+               --index-url "${PIP_FALLBACK_INDEX_URL}" --timeout 60 --retries 2; })
 
 COPY . /app
 
