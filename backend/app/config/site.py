@@ -1,6 +1,6 @@
 """Public site domain — used by deploy auto-config and store settings."""
 
-SITE_DOMAIN = "digigadg.com"
+SITE_DOMAIN = "digigadg.ir"
 
 
 def domain_hosts(domain: str | None = None) -> list[str]:

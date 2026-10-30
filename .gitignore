@@ -23,6 +23,7 @@ htmlcov/
 .mypy_cache/
 *.egg-info/
 .docker-data/
+.restore-state/
 
 # Production SSL secrets (use ssl-*.example as template)
 deploy/ssl/ssl-certificate.pem

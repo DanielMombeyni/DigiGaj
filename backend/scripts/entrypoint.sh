@@ -16,8 +16,10 @@ if [ "${DJANGO_ENV:-}" = "production" ] && [ "${AUTO_DEPLOY_CONFIG:-1}" != "0" ]
     set +a
   fi
 fi
-python manage.py seed_bootstrap --if-needed || true
-if [ "${RUN_SEED:-0}" = "1" ]; then
-  python manage.py seed_demo --if-needed || true
+if [ "${SKIP_SEED:-0}" != "1" ]; then
+  python manage.py seed_bootstrap --if-needed || true
+  if [ "${RUN_SEED:-0}" = "1" ]; then
+    python manage.py seed_demo --if-needed || true
+  fi
 fi
 exec "$@"

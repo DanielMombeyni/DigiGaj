@@ -37,14 +37,14 @@ services:
       DJANGO_ENV: production
       DJANGO_DEBUG: "False"
       AUTO_DEPLOY_CONFIG: "1"
-      SITE_DOMAIN: digigadg.com
-      PUBLIC_API_BASE: https://digigadg.com
-      FRONTEND_URL: https://digigadg.com
+      SITE_DOMAIN: digigadg.ir
+      PUBLIC_API_BASE: ${PUBLIC_SCHEME:-https}://digigadg.ir
+      FRONTEND_URL: ${PUBLIC_SCHEME:-https}://digigadg.ir
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
-      RUN_SEED: "1"
+      RUN_SEED: ${RUN_SEED:-1}
     volumes:
       - media_prod:/app/media
       - static_prod:/app/staticfiles
@@ -78,9 +78,9 @@ services:
     environment:
       DJANGO_ENV: production
       AUTO_DEPLOY_CONFIG: "1"
-      SITE_DOMAIN: digigadg.com
-      PUBLIC_API_BASE: https://digigadg.com
-      FRONTEND_URL: https://digigadg.com
+      SITE_DOMAIN: digigadg.ir
+      PUBLIC_API_BASE: ${PUBLIC_SCHEME:-https}://digigadg.ir
+      FRONTEND_URL: ${PUBLIC_SCHEME:-https}://digigadg.ir
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
@@ -102,9 +102,9 @@ services:
     environment:
       DJANGO_ENV: production
       AUTO_DEPLOY_CONFIG: "1"
-      SITE_DOMAIN: digigadg.com
-      PUBLIC_API_BASE: https://digigadg.com
-      FRONTEND_URL: https://digigadg.com
+      SITE_DOMAIN: digigadg.ir
+      PUBLIC_API_BASE: ${PUBLIC_SCHEME:-https}://digigadg.ir
+      FRONTEND_URL: ${PUBLIC_SCHEME:-https}://digigadg.ir
       POSTGRES_HOST: db
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
@@ -127,6 +127,8 @@ services:
 
   proxy:
     image: nginx:1.27-alpine
+    environment:
+      DISABLE_ORIGIN_TLS: ${DISABLE_ORIGIN_TLS:-0}
     volumes:
       - ./deploy/nginx/http.conf:/etc/nginx/templates/http.conf:ro
       - ./deploy/nginx/https.conf:/etc/nginx/templates/https.conf:ro

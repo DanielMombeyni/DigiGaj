@@ -41,7 +41,7 @@ find_cert() {
   return 1
 }
 
-if result="$(find_cert)"; then
+if [ "${DISABLE_ORIGIN_TLS:-0}" != "1" ] && result="$(find_cert)"; then
   cert="${result%%|*}"
   key="${result#*|}"
   echo "proxy: SSL cert found — HTTPS enabled"

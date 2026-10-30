@@ -22,7 +22,7 @@ print_urls() {
     echo "  Docs:     http://localhost:8000/api/docs/"
     echo "  Admin:    http://localhost:8000/admin/"
   else
-    echo "  Site:     https://digigadg.com (or http://SERVER_IP without SSL)"
+    echo "  Site:     https://digigadg.ir (or http://SERVER_IP without SSL)"
     echo "  API:      /api/v1/ (same domain via proxy)"
     echo "  Panel:    /panel-dashboard"
   fi
@@ -54,6 +54,10 @@ Commands:
   migrate         Run migrations
   test            Run backend tests
   frontend-sh     Open frontend shell
+  restore <path>  Restore a transfer .tar.gz or extracted backup directory
+                  Production only; requires fresh destination volumes.
+                  Also accepts: restore database.dump media.tar.gz config.tar.gz
+                  Options: --http-only (no SSL), --start-workers (enable Celery)
   prune           Remove unused docker data for this project (careful)
 
 Examples:
@@ -61,6 +65,7 @@ Examples:
   ./docker.sh Production rebuild
   ./docker.sh Production restart
   ./docker.sh Production restart backend proxy
+  ./docker.sh Production restore /root/digigaj-backup.ABC12345.tar.gz
   ./docker.sh dev up
   ./docker.sh dev logs backend
 EOF
@@ -99,8 +104,18 @@ main() {
     exit 1
   }
 
-  ensure_env
   shift 2 || true
+
+  if [[ "$cmd" == "restore" ]]; then
+    if [[ "$env" == "dev" ]]; then
+      echo "restore is only available for Production; development data is not a destination."
+      exit 1
+    fi
+    command -v python3 >/dev/null || { echo "Install python3 on the destination server first."; exit 1; }
+    exec python3 "$ROOT_DIR/deploy/restore.py" "$@"
+  fi
+
+  ensure_env
 
   case "$cmd" in
     up)

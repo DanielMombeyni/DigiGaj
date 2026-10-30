@@ -76,7 +76,7 @@ flowchart LR
 
 ### دامنه
 
-- دامنه اصلی پروژه: **`digigadg.com`**
+- دامنه اصلی پروژه: **`digigadg.ir`**
 - DNS (ترجیحاً Cloudflare) به IP سرور اشاره کند
 
 ---
@@ -117,7 +117,7 @@ POSTGRES_PASSWORD=<رمز-قوی-دیتابیس>
 |--------|--------|------------|
 | `DJANGO_SECRET_KEY` | کلید امن Django | **الزامی — یکتا و محرمانه** |
 | `POSTGRES_PASSWORD` | رمز PostgreSQL | **الزامی — قوی** |
-| `SITE_DOMAIN` | دامنه سایت | `digigadg.com` (پیش‌فرض در compose) |
+| `SITE_DOMAIN` | دامنه سایت | `digigadg.ir` (پیش‌فرض در compose) |
 | `AUTO_DEPLOY_CONFIG` | تشخیص خودکار IP/دامنه | `1` (در compose) |
 | `PUBLIC_API_BASE` | آدرس عمومی API و تصاویر | خودکار از دامنه — مقدار `localhost` در production نادیده گرفته می‌شود |
 | `FRONTEND_URL` | آدرس فرانت | معمولاً خودکار — `localhost` در production نادیده گرفته می‌شود |
@@ -126,8 +126,8 @@ POSTGRES_PASSWORD=<رمز-قوی-دیتابیس>
 متغیرهای اختیاری:
 
 ```env
-EXTRA_ALLOWED_HOSTS=api.digigadg.com
-EXTRA_CORS_ORIGINS=https://api.digigadg.com
+EXTRA_ALLOWED_HOSTS=api.digigadg.ir
+EXTRA_CORS_ORIGINS=https://api.digigadg.ir
 ```
 
 ---
@@ -136,7 +136,7 @@ EXTRA_CORS_ORIGINS=https://api.digigadg.com
 
 ### DNS در Cloudflare
 
-1. رکورد **A** برای `digigadg.com` → IP سرور
+1. رکورد **A** برای `digigadg.ir` → IP سرور
 2. رکورد **A** یا **CNAME** برای `www` → همان مقصد (اختیاری)
 3. حالت SSL پیشنهادی: **Full (strict)** — نیاز به Origin Certificate روی سرور
 
@@ -205,7 +205,7 @@ chmod +x docker.sh
 
 | بخش | آدرس |
 |-----|------|
-| فروشگاه | `https://digigadg.com` یا `http://IP_SERVER` |
+| فروشگاه | `https://digigadg.ir` یا `http://IP_SERVER` |
 | پنل مدیریت | `/panel-dashboard` |
 | API | `/api/v1/` |
 | Django Admin | `/admin/` |
@@ -259,9 +259,9 @@ chmod +x docker.sh
 
 با `AUTO_DEPLOY_CONFIG=1` (پیش‌فرض Production) این موارد **خودکار** تنظیم می‌شوند:
 
-- **`ALLOWED_HOSTS`**: `digigadg.com`, `www.digigadg.com`, IP عمومی سرور, IP لوکال, hostname
+- **`ALLOWED_HOSTS`**: `digigadg.ir`, `www.digigadg.ir`, IP عمومی سرور, IP لوکال, hostname
 - **`CORS_ALLOWED_ORIGINS`** / **`CSRF_TRUSTED_ORIGINS`**: بر اساس http/https و دامنه/IP
-- **`PUBLIC_API_BASE`** / **`FRONTEND_URL`**: `https://digigadg.com` یا `http://...` بسته به SSL
+- **`PUBLIC_API_BASE`** / **`FRONTEND_URL`**: `https://digigadg.ir` یا `http://...` بسته به SSL
 - **`TLS_ENABLED`**: اگر فایل‌های SSL معتبر باشند
 
 اسکریپت تشخیص: `backend/scripts/detect_deploy_env.py`  
@@ -389,7 +389,7 @@ cat backup.sql | docker compose -f docker-compose.prod.yml exec -T db \
 
 ```bash
 ./docker.sh Production restart proxy
-curl -I https://digigadg.com/media/products/<filename>
+curl -I https://digigadg.ir/media/products/<filename>
 ```
 
 - پاسخ باید `200` باشد، نه `404`

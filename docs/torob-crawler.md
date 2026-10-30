@@ -63,7 +63,7 @@ exact deployed asset hashes, styles, scripts and React application. It does not
 fetch a user-controlled URL, forward user cookies, execute JavaScript or serve
 different HTML to bots. `/index.html` stays on the frontend to avoid proxy loops.
 
-- `FRONTEND_URL`: canonical public storefront origin, e.g. `https://digigadg.com`.
+- `FRONTEND_URL`: canonical public storefront origin, e.g. `https://digigadg.ir`.
   It supplies canonical URLs, image origins and sitemap links. Confirm this value
   for the actual deployment; request Host headers do not control published URLs.
 - `FRONTEND_HTML_URL`: fixed internal shell endpoint. Default production value:
@@ -180,7 +180,7 @@ no global Git setting was changed and no reset/clean/stash was used.
 ## Torob handoff after deployment
 
 Submit the publicly verified sitemap index. With the repository's configured
-production domain, the candidate is `https://digigadg.com/sitemap.xml`.
+production domain, the candidate is `https://digigadg.ir/sitemap.xml`.
 This is a **deployment target, not a verified working public URL**.
 
 After deployment, fetch that URL unauthenticated, follow every sitemap child,

@@ -6,5 +6,6 @@
 | [server-deployment-checklist.md](./server-deployment-checklist.md) | چک‌لیست عملیاتی قبل/حین/بعد از استقرار |
 | [server-deployment-known-limitations.md](./server-deployment-known-limitations.md) | محدودیت‌ها و موارد اثبات‌نشده |
 | [production.md](./production.md) | مرجع فنی کوتاه‌تر استقرار Production |
+| [production-restore.md](./production-restore.md) | بازیابی خودکار بکاپ روی سرور تازه و دامنه digigadg.ir |
 | [sms-test-isolation.md](./sms-test-isolation.md) | ایزوله بودن دیتابیس تست SMS (طراحی + وضعیت runtime) |
 | [PAYMENT.md](./PAYMENT.md) | مستندات پرداخت |
