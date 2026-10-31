@@ -38,6 +38,7 @@ services:
       DJANGO_DEBUG: "False"
       AUTO_DEPLOY_CONFIG: "1"
       SITE_DOMAIN: digigadg.ir
+      PUBLIC_SERVER_IP: ${PUBLIC_SERVER_IP:-87.107.54.205}
       PUBLIC_API_BASE: ${PUBLIC_SCHEME:-https}://digigadg.ir
       FRONTEND_URL: ${PUBLIC_SCHEME:-https}://digigadg.ir
       POSTGRES_HOST: db
@@ -79,6 +80,7 @@ services:
       DJANGO_ENV: production
       AUTO_DEPLOY_CONFIG: "1"
       SITE_DOMAIN: digigadg.ir
+      PUBLIC_SERVER_IP: ${PUBLIC_SERVER_IP:-87.107.54.205}
       PUBLIC_API_BASE: ${PUBLIC_SCHEME:-https}://digigadg.ir
       FRONTEND_URL: ${PUBLIC_SCHEME:-https}://digigadg.ir
       POSTGRES_HOST: db
@@ -103,6 +105,7 @@ services:
       DJANGO_ENV: production
       AUTO_DEPLOY_CONFIG: "1"
       SITE_DOMAIN: digigadg.ir
+      PUBLIC_SERVER_IP: ${PUBLIC_SERVER_IP:-87.107.54.205}
       PUBLIC_API_BASE: ${PUBLIC_SCHEME:-https}://digigadg.ir
       FRONTEND_URL: ${PUBLIC_SCHEME:-https}://digigadg.ir
       POSTGRES_HOST: db

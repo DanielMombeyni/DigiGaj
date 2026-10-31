@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
+from ipaddress import IPv4Address
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -98,6 +99,10 @@ def detect_local_ips() -> list[str]:
 
 
 def detect_public_ip(timeout: float = 3.0) -> str | None:
+    configured = os.environ.get("PUBLIC_SERVER_IP", "").strip()
+    if configured:
+        # An explicit origin IP takes precedence over egress/NAT detection.
+        return str(IPv4Address(configured))
     endpoints = (
         "https://api.ipify.org",
         "https://ifconfig.me/ip",

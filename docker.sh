@@ -22,7 +22,7 @@ print_urls() {
     echo "  Docs:     http://localhost:8000/api/docs/"
     echo "  Admin:    http://localhost:8000/admin/"
   else
-    echo "  Site:     https://digigadg.ir (or http://SERVER_IP without SSL)"
+    echo "  Site:     https://digigadg.ir (configured origin: 87.107.54.205)"
     echo "  API:      /api/v1/ (same domain via proxy)"
     echo "  Panel:    /panel-dashboard"
   fi

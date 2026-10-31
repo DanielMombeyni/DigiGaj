@@ -81,6 +81,8 @@ class RestoreTests(unittest.TestCase):
         self.assertIn("POSTGRES_PASSWORD='a=b#c'", result)
         self.assertEqual(result.count("SITE_DOMAIN="), 1)
         self.assertIn("SITE_DOMAIN=digigadg.ir", result)
+        self.assertIn("PUBLIC_SERVER_IP=87.107.54.205", result)
+        self.assertIn("digigadg.ir,www.digigadg.ir,87.107.54.205,localhost", result)
         self.assertIn("SKIP_SEED=1", result)
         self.assertIn("RUN_SEED=0", result)
         self.assertIn("PUBLIC_SCHEME=https", result)

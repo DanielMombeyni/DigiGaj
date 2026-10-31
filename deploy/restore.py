@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parent.parent
 DOMAIN = "digigadg.ir"
+SERVER_IP = "87.107.54.205"
 BACKUP_FILES = {"database.dump", "media.tar.gz", "config.tar.gz"}
 SSL_PAIRS = (
     ("ssl-certificate.pem", "ssl-private.key"),
@@ -203,9 +204,10 @@ def migrated_env(original: str, *, http_only: bool) -> str:
         "DJANGO_ENV": "production",
         "DJANGO_DEBUG": "False",
         "SITE_DOMAIN": DOMAIN,
+        "PUBLIC_SERVER_IP": SERVER_IP,
         "PUBLIC_API_BASE": f"{scheme}://{DOMAIN}",
         "FRONTEND_URL": f"{scheme}://{DOMAIN}",
-        "DJANGO_ALLOWED_HOSTS": f"{DOMAIN},www.{DOMAIN},localhost,127.0.0.1,backend",
+        "DJANGO_ALLOWED_HOSTS": f"{DOMAIN},www.{DOMAIN},{SERVER_IP},localhost,127.0.0.1,backend",
         "CORS_ALLOWED_ORIGINS": f"{scheme}://{DOMAIN},{scheme}://www.{DOMAIN}",
         "CSRF_TRUSTED_ORIGINS": f"https://{DOMAIN},https://www.{DOMAIN},http://{DOMAIN},http://www.{DOMAIN}",
         "POSTGRES_HOST": "db",
