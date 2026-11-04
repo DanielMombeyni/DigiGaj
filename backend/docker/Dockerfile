@@ -6,10 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+ARG APT_FALLBACK_BASE=https://cloudfront.debian.net
 RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
     && printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-network-retries \
-    && apt-get update --error-on=any && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl \
+    && ( (apt-get update --error-on=any \
+          && apt-get install -y --no-install-recommends build-essential libpq-dev curl) \
+      || { echo "Primary Debian repository failed; trying ${APT_FALLBACK_BASE}"; \
+           rm -rf /var/lib/apt/lists/*; \
+           sed -i "s|https://deb.debian.org|${APT_FALLBACK_BASE}|g" /etc/apt/sources.list.d/debian.sources; \
+           apt-get update --error-on=any \
+           && apt-get install -y --no-install-recommends build-essential libpq-dev curl; }) \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/ /tmp/requirements/
