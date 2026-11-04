@@ -112,6 +112,8 @@ def _xml_response(root):
 def sitemap_index(request):
     pages = Paginator(public_products().only("pk"), SITEMAP_PAGE_SIZE).num_pages
     root = Element("sitemapindex", xmlns=SITEMAP_NS)
+    blog = SubElement(root, "sitemap")
+    SubElement(blog, "loc").text = storefront_url("/sitemap-blog.xml")
     for page in range(1, pages + 1):
         item = SubElement(root, "sitemap")
         SubElement(item, "loc").text = storefront_url(f"/sitemap-products.xml?p={page}")

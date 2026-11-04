@@ -492,6 +492,7 @@ export default function ProductsPage() {
         title="محصولات"
         description={`کاتالوگ گجت‌ها و لوازم دیجیتال ${brand.name} — فیلتر دسته‌بندی، بازه قیمت و مرتب‌سازی`}
         path={`/products${seoQuery ? `?${seoQuery}` : ''}`}
+        noindex={Boolean(seoQuery)}
       />
 
       {/* Centered page title */}

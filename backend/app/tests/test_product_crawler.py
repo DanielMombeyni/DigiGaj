@@ -288,6 +288,7 @@ def test_sitemap_pagination_absolute_urls_escaping_and_robots(client, monkeypatc
     ns = {"s": product_html.SITEMAP_NS}
     index = ElementTree.fromstring(client.get("/sitemap.xml").content)
     assert [n.text for n in index.findall("s:sitemap/s:loc", ns)] == [
+        "https://store.example/sitemap-blog.xml",
         "https://store.example/sitemap-products.xml?p=1",
         "https://store.example/sitemap-products.xml?p=2",
     ]

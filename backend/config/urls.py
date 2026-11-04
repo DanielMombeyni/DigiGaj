@@ -10,8 +10,14 @@ from drf_spectacular.views import (
 from rest_framework_simplejwt.views import TokenRefreshView
 from app.serializers.auth_token import EmailOrUsernameTokenView
 from app.views.product_html import product_detail_html, product_sitemap, robots_txt, sitemap_index
+from app.views.blog import blog_page, blog_sitemap
 
 urlpatterns = [
+    path("blog", blog_page),
+    path("blog/", blog_page, name="blog-index"),
+    path("blog/<slug:slug>", blog_page),
+    path("blog/<slug:slug>/", blog_page, name="blog-article"),
+    path("sitemap-blog.xml", blog_sitemap, name="blog-sitemap"),
     path("products/<str:slug>", product_detail_html, name="public-product"),
     path("products/<str:slug>/", product_detail_html),
     path("sitemap.xml", sitemap_index, name="sitemap-index"),

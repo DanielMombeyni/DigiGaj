@@ -3,6 +3,7 @@ import { brand } from '@/config/brand'
 import { mediaSrc } from '@/utils/media'
 import { readAppearance } from '@/config/theme'
 import { peekStorefrontConfig } from '@/services/storefrontConfig'
+import { canonicalUrl } from '@/utils/seo'
 
 const DEFAULT_DESC = brand.defaultDescription
 
@@ -20,7 +21,7 @@ export default function Seo({
   productMetadata,
 }) {
   const fullTitle = title ? `${title} | ${brand.name}` : brand.defaultTitle
-  const url = productMetadata?.url || (typeof window !== 'undefined' ? `${window.location.origin}${path}` : path)
+  const url = productMetadata?.url || canonicalUrl(brand.siteUrl, path)
   const fallbackIcon = type === 'product' ? '' : (
     peekStorefrontConfig()?.site_icon || readAppearance()?.site_icon || ''
   )
@@ -60,7 +61,7 @@ export default function Seo({
     }
 
     upsert('name', 'description', description)
-    upsert('name', 'robots', noindex ? 'noindex,nofollow' : 'index,follow')
+    upsert('name', 'robots', noindex ? 'noindex,follow' : 'index,follow,max-image-preview:large')
     upsert('property', 'og:title', fullTitle)
     upsert('property', 'og:description', description)
     upsert('property', 'og:type', type)
@@ -77,7 +78,13 @@ export default function Seo({
     }
     upsert('property', 'og:locale', 'fa_IR')
     upsert('property', 'og:site_name', brand.name)
-    upsert('name', 'twitter:card', 'summary_large_image')
+    upsert('name', 'twitter:card', siteIcon ? 'summary_large_image' : 'summary')
+    if (siteIcon) {
+      const twitterImage = mediaSrc(siteIcon) || siteIcon
+      upsert('name', 'twitter:image', new URL(twitterImage, brand.siteUrl).href)
+    } else {
+      document.head.querySelector('meta[name="twitter:image"]')?.remove()
+    }
     upsert('name', 'twitter:title', fullTitle)
     upsert('name', 'twitter:description', description)
 
